@@ -3035,6 +3035,20 @@
         "abstract": false
       },
       {
+        "name": "EditarRenglonBorrador",
+        "type": "void",
+        "parameters": [
+          {
+            "name": "fila",
+            "type": "DataGridViewRow",
+            "default": ""
+          }
+        ],
+        "visibility": "Private",
+        "static": false,
+        "abstract": false
+      },
+      {
         "name": "AgregarRenglonBorrador",
         "type": "void",
         "parameters": [],
@@ -3239,6 +3253,30 @@
             "default": ""
           }
         ],
+        "visibility": "Private",
+        "static": false,
+        "abstract": false
+      },
+      {
+        "name": "ConfirmarDescarteVenta",
+        "type": "bool",
+        "parameters": [],
+        "visibility": "Protected",
+        "static": false,
+        "abstract": false
+      },
+      {
+        "name": "NuevaVenta",
+        "type": "void",
+        "parameters": [],
+        "visibility": "Private",
+        "static": false,
+        "abstract": false
+      },
+      {
+        "name": "LimpiarVenta",
+        "type": "void",
+        "parameters": [],
         "visibility": "Private",
         "static": false,
         "abstract": false
