@@ -50,7 +50,10 @@ namespace UI.UserControls
         public UC_EvaluacionProveedores()
         {
             Dock = DockStyle.Fill; BindingContext = new BindingContext();
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 9, Padding = new Padding(8) };
+            var desplazamiento = new Panel { Name = "scrollEvaluacion", Dock = DockStyle.Fill, AutoScroll = true };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 9, Padding = new Padding(8) };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            desplazamiento.SizeChanged += delegate { layout.MinimumSize = new Size(0, desplazamiento.ClientSize.Height); };
             for (int i = 0; i < 9; i++) layout.RowStyles.Add(i == 4 ? new RowStyle(SizeType.Percent, 100) : new RowStyle(SizeType.AutoSize));
             var filtros = Flujo(); Campo(filtros, "Perfume", producto); Campo(filtros, "Cantidad a comprar", cantidad);
             filtros.Controls.Add(Boton("Comparar", "btnCompararProveedores", Comparar));
@@ -66,7 +69,7 @@ namespace UI.UserControls
             layout.Controls.Add(filtros, 0, 0); layout.Controls.Add(criterios, 0, 1); layout.Controls.Add(contexto, 0, 2);
             var tarjetas = Flujo(); foreach (var tarjeta in new[] { stock, pendientes, ventas, reposicion }) tarjetas.Controls.Add(tarjeta);
             layout.Controls.Add(tarjetas, 0, 3);
-            var resultados = new PestanasTematicas { Name = "tabsResultadosEvaluacion", Dock = DockStyle.Fill };
+            var resultados = new PestanasTematicas { Name = "tabsResultadosEvaluacion", Dock = DockStyle.Fill, MinimumSize = new Size(0, 250) };
             var resumen = new TabPage("Resumen visual"); var listado = new TabPage("Listado completo");
             var graficos = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
             graficos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); graficos.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -98,7 +101,7 @@ namespace UI.UserControls
             Campo(pie, "Comparaciones guardadas", historial);
             historial.Format += delegate(object sender, ListControlConvertEventArgs e) { var r = (ResumenEvaluacion)e.ListItem; e.Value = "#" + r.IdEvaluacion + " · " + r.Fecha.ToString("dd/MM HH:mm") + " · " + r.ProveedorSeleccionado; };
             pie.Controls.Add(Boton("Abrir", "btnAbrirEvaluacion", AbrirHistorial));
-            layout.Controls.Add(pie, 0, 7); layout.Controls.Add(estado, 0, 8); Controls.Add(layout);
+            layout.Controls.Add(pie, 0, 7); layout.Controls.Add(estado, 0, 8); desplazamiento.Controls.Add(layout); Controls.Add(desplazamiento);
             producto.SelectedIndexChanged += delegate { if (!cargando) CambiarProducto(); };
             foreach (var n in new[] { cantidad, precio, prestigio, antiguedad }) n.ValueChanged += delegate { if (!cargando) Invalidar(true); };
             foreach (var chart in new[] { puntajes, margenes }) chart.MouseClick += ElegirDesdeGrafico;
