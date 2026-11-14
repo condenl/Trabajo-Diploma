@@ -144,6 +144,16 @@ La biblioteca se restaura por NuGet al compilar en Visual Studio o con `Installe
 
 Verificación: `dotnet test Arquitectura.Tests/Arquitectura.Tests.csproj --configuration Release`. Después de compilar el instalador, `powershell -NoProfile -File Scripts/test-ordenes-archivos.ps1 -ServerInstance "DESKTOP-TFHVP49"` ejecuta pruebas de componentes WinForms y SQL en una base aislada, conserva los XML/PDF generados y no cambia `UI/App.config`. También admite `"(localdb)\MSSQLLocalDB"` 16+.
 
+## Preparar compras y recepciones para la demo
+
+En **Órdenes de compra → Nuevo borrador**, elegir proveedor y agregar los perfumes con **Agregar / actualizar producto**. La tabla muestra cantidad, precio y subtotal por perfume; agregar nuevamente el mismo perfume actualiza su línea. **Quitar seleccionado** retira una línea y **Crear borrador** guarda la compra completa. El proveedor queda fijo mientras haya líneas. **Nuevo borrador** y **Cancelar** piden confirmar antes de descartar una preparación.
+
+Los importes usan coma decimal: `12.000,50` o `12000,50`. El editor conserva y señala entradas inválidas, fuera de rango o con demasiados decimales; una entrada como `12000.50` se rechaza. No se reemplaza silenciosamente por otro importe ni se permite guardar hasta corregirla.
+
+En **Recepción e inventario**, cambiar de orden o perfume con datos preparados requiere confirmar su descarte. **Actualizar** conserva el contexto de la entrega y señala si una recepción de otro operador redujo su saldo. Al registrar el ingreso se muestran inmediatamente las existencias y la trazabilidad del perfume recibido. Las escrituras de Compras, Depósito y Ventas requieren una sesión activa y el permiso del actor.
+
+Validación reproducible: `powershell -NoProfile -File Scripts/test-usabilidad-operativa.ps1 -ServerInstance "DESKTOP-TFHVP49"` (o `"(localdb)\MSSQLLocalDB"`). Crea una base aislada; no modifica la configuración de desarrollo. Evidencia: [Verificacion_Demo_Compras.md](Documentacion/Verificacion_Demo_Compras.md).
+
 ## N03: evaluación de proveedores
 
 En **Compras e inventario → Evaluación de proveedores**: elegir perfume y cantidad, pulsar **Comparar**, revisar el ranking y **Confirmar proveedor** con un fundamento. **Crear orden en Borrador** permite continuar por el circuito habitual de Contabilidad; reintentar devuelve el mismo borrador.

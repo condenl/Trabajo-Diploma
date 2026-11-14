@@ -14,10 +14,14 @@ namespace UI.UserControls
     public class UC_Aprovisionamiento : UserControl, IVistaConCambiosPendientes
     {
         public bool TieneCambiosPendientes { get { return
-            (formularioOrden != null && formularioOrden.Visible && (nudOrdenPrecio.Value > 0 || nudOrdenCantidad.Value != 1)) ||
+            TieneBorradorPendiente || TieneRecepcionPendiente ||
             nudCotizacionPrecio.Value > 0 || !string.IsNullOrWhiteSpace(txtCotizacionCondiciones.Text) ||
-            !string.IsNullOrWhiteSpace(txtLoteCodigo.Text) || !string.IsNullOrWhiteSpace(txtLoteOrigen.Text) ||
+            EdicionNumerica(nudCotizacionPrecio) || EdicionNumerica(nudCotizacionPlazo) ||
             (evaluacion != null && evaluacion.TieneCambiosPendientes); } }
+        private bool TieneBorradorPendiente { get { return renglonesOrden.Rows.Count > 0 || nudOrdenPrecio.Value > 0 || nudOrdenCantidad.Value != 1 || EdicionNumerica(nudOrdenPrecio) || EdicionNumerica(nudOrdenCantidad); } }
+        private bool TieneRecepcionPendiente { get { return !string.IsNullOrWhiteSpace(txtLoteCodigo.Text) || !string.IsNullOrWhiteSpace(txtLoteOrigen.Text) ||
+            nudLoteCantidad.Value != 1 || EdicionNumerica(nudLoteCantidad) || !dtpLoteVencimiento.Checked || dtpLoteVencimiento.Value.Date != vencimientoInicial; } }
+        private static bool EdicionNumerica(NumericUpDown control) { var n = control as NumeroRegional; return n != null && n.TieneEdicionPendiente; }
         public bool ModoPrueba { get; set; }
         public string UltimoMensaje { get; private set; }
         public string UltimoError { get; private set; }
@@ -35,9 +39,13 @@ namespace UI.UserControls
         private UC_EvaluacionProveedores evaluacion;
         private bool recargando;
         private bool enlazandoRecepcion;
+        private int ordenRecepcionActual, productoRecepcionActual;
+        private readonly DateTime vencimientoInicial = DateTime.Today.AddYears(2);
         private Button registrarRecepcion;
         private readonly Label saldoRecepcion = new Label { Name = "lblSaldoRecepcion", AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(4, 8, 4, 8) };
         private FlowLayoutPanel formularioOrden;
+        private readonly DataGridView renglonesOrden = Grilla("dgvRenglonesOrden");
+        private readonly Label totalBorrador = new Label { Name = "lblTotalBorrador", AutoSize = true, Margin = new Padding(4, 10, 4, 4) };
         private Button enviarRevision, emitirProveedor;
         private readonly Label ayudaOrden = new Label { Name = "lblAccionOrden", AutoSize = true, Margin = new Padding(6, 8, 3, 3), MaximumSize = new Size(460, 0) };
         private readonly ComboBox filtroProveedor = Combo("cmbFiltroProveedor");
@@ -200,7 +208,7 @@ namespace UI.UserControls
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             layout.Controls.Add(Titulo("Orden de compra y envío a revisión contable"), 0, 0);
             FlowLayoutPanel barra = FlujoHorizontal();
-            barra.Controls.Add(Boton("Nuevo borrador", "btnNuevoBorrador", delegate { formularioOrden.Visible = !formularioOrden.Visible; }));
+            barra.Controls.Add(Boton("Nuevo borrador", "btnNuevoBorrador", delegate { NuevoBorrador(); }));
             enviarRevision = Boton("Enviar a Contabilidad", "btnEnviarRevision", EnviarRevision);
             emitirProveedor = Boton("Emitir al proveedor", "btnEmitirOrden", EmitirOrden);
             barra.Controls.Add(enviarRevision); barra.Controls.Add(emitirProveedor);
@@ -211,13 +219,30 @@ namespace UI.UserControls
             dgvOrdenes.CurrentCellChanged += delegate { ActualizarAccionesOrden(); };
             foreach (Button boton in barra.Controls.OfType<Button>()) boton.Margin = new Padding(3);
             layout.Controls.Add(barra, 0, 1);
-            formularioOrden = FlujoHorizontal(); formularioOrden.Name = "panelNuevaOrden"; formularioOrden.Visible = false;
-            AgregarCampo(formularioOrden, "Proveedor", cmbOrdenProveedor, 210);
-            AgregarCampo(formularioOrden, "Perfume", cmbOrdenProducto, 210);
-            AgregarCampo(formularioOrden, "Cantidad", nudOrdenCantidad, 85);
-            AgregarCampo(formularioOrden, "Precio compra", nudOrdenPrecio, 105);
-            formularioOrden.Controls.Add(Boton("Crear borrador", "btnCrearOrden", CrearOrden));
-            formularioOrden.Controls.Add(Boton("Cancelar", "btnCancelarNuevaOrden", delegate { formularioOrden.Visible = false; }));
+            formularioOrden = new FlowLayoutPanel { Name = "panelNuevaOrden", Dock = DockStyle.Fill, AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Visible = false };
+            var editor = FlujoHorizontal();
+            AgregarCampo(editor, "Proveedor", cmbOrdenProveedor, 210);
+            AgregarCampo(editor, "Perfume", cmbOrdenProducto, 210);
+            AgregarCampo(editor, "Cantidad", nudOrdenCantidad, 85);
+            AgregarCampo(editor, "Precio compra", nudOrdenPrecio, 105);
+            editor.Controls.Add(Boton("Agregar / actualizar producto", "btnAgregarRenglonOrden", delegate { Ejecutar(AgregarRenglonBorrador, null); }));
+            renglonesOrden.Dock = DockStyle.None; renglonesOrden.Visible = false; renglonesOrden.Height = 72;
+            renglonesOrden.Columns.Add("IdProducto", "Id"); renglonesOrden.Columns[0].Visible = false;
+            renglonesOrden.Columns.Add("Producto", "Perfume"); renglonesOrden.Columns.Add("Cantidad", "Cantidad");
+            renglonesOrden.Columns.Add("PrecioUnitario", "Precio unitario"); renglonesOrden.Columns.Add("Subtotal", "Subtotal");
+            renglonesOrden.Columns["Producto"].FillWeight = 230;
+            foreach (string col in new[] { "PrecioUnitario", "Subtotal" }) renglonesOrden.Columns[col].DefaultCellStyle.Format = "C2";
+            var accionesBorrador = FlujoHorizontal(); accionesBorrador.Controls.Add(totalBorrador);
+            accionesBorrador.Controls.Add(Boton("Quitar seleccionado", "btnQuitarRenglonOrden", delegate {
+                if (renglonesOrden.CurrentRow != null) renglonesOrden.Rows.Remove(renglonesOrden.CurrentRow); ActualizarBorrador();
+            }));
+            accionesBorrador.Controls.Add(Boton("Crear borrador", "btnCrearOrden", CrearOrden));
+            accionesBorrador.Controls.Add(Boton("Cancelar", "btnCancelarNuevaOrden", delegate { CancelarBorrador(); }));
+            formularioOrden.Controls.Add(editor); formularioOrden.Controls.Add(renglonesOrden); formularioOrden.Controls.Add(accionesBorrador);
+            formularioOrden.SizeChanged += delegate {
+                editor.Width = accionesBorrador.Width = renglonesOrden.Width = Math.Max(300, formularioOrden.ClientSize.Width - 8);
+            };
+            ActualizarBorrador();
             layout.Controls.Add(formularioOrden, 0, 2);
             var archivos = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Padding = new Padding(5) };
             btnReporteOrdenesPdf = Boton("Reporte PDF", "btnReporteOrdenesPdf", GenerarReportePdf);
@@ -284,7 +309,7 @@ namespace UI.UserControls
             cmbOrdenRecepcion.DropDownWidth = 520;
             cmbOrdenRecepcion.SelectedIndexChanged += CambiarOrdenRecepcion;
             AgregarCampo(recepcion, "Perfume", cmbRecepcionProducto, 200);
-            cmbRecepcionProducto.SelectedIndexChanged += delegate { ActualizarSaldoRecepcion(); };
+            cmbRecepcionProducto.SelectedIndexChanged += CambiarProductoRecepcion;
             AgregarCampo(recepcion, "Código lote", txtLoteCodigo, 110);
             AgregarCampo(recepcion, "Origen", txtLoteOrigen, 130);
             AgregarCampo(recepcion, "Cantidad", nudLoteCantidad, 80);
@@ -535,9 +560,14 @@ namespace UI.UserControls
         private void CargarOrdenesRecepcion()
         {
             if (!TienePermiso(TipoPermiso.Inventario_Recepcionar)) return;
-            List<OrdenCompra> ordenes = aprovisionamientoBLL.ConsultarHistorialCompras(null)
+            var anterior = cmbOrdenRecepcion.SelectedItem as OrdenRecepcionVista;
+            var todas = aprovisionamientoBLL.ConsultarHistorialCompras(null);
+            List<OrdenCompra> ordenes = todas
                 .Where(o => o.Estado == EstadoOrdenCompra.Emitida || o.Estado == EstadoOrdenCompra.RecibidaParcial)
                 .ToList();
+            // Un cambio externo no debe trasladar los datos preparados a la primera orden disponible.
+            if (anterior != null && TieneRecepcionPendiente && !ordenes.Any(o => o.IdOrdenCompra == anterior.IdOrdenCompra))
+                ordenes.Add(todas.FirstOrDefault(o => o.IdOrdenCompra == anterior.IdOrdenCompra) ?? anterior.Orden);
             var proveedores = proveedorBLL.Listar(false).ToDictionary(p => p.IdProveedor, p => p.RazonSocial);
             enlazandoRecepcion = true;
             try { Enlazar(cmbOrdenRecepcion, ordenes.Select(o => new OrdenRecepcionVista(o, proveedores.ContainsKey(o.IdProveedor) ? proveedores[o.IdProveedor] : "Proveedor no disponible")).ToList(), "Descripcion", "IdOrdenCompra"); }
@@ -549,6 +579,14 @@ namespace UI.UserControls
         {
             if (enlazandoRecepcion) return;
             OrdenRecepcionVista vista = cmbOrdenRecepcion.SelectedItem as OrdenRecepcionVista;
+            int nueva = vista == null ? 0 : vista.IdOrdenCompra;
+            if (nueva != ordenRecepcionActual && TieneRecepcionPendiente && !ConfirmarDescarte("la recepción preparada")) {
+                enlazandoRecepcion = true;
+                try { cmbOrdenRecepcion.SelectedValue = ordenRecepcionActual; } finally { enlazandoRecepcion = false; }
+                ActualizarSaldoRecepcion(); return;
+            }
+            if (nueva != ordenRecepcionActual) LimpiarRecepcion();
+            ordenRecepcionActual = nueva;
             List<Producto> productos = new List<Producto>();
             if (vista != null)
             {
@@ -558,8 +596,34 @@ namespace UI.UserControls
                     if (producto != null) productos.Add(producto);
                 }
             }
-            Enlazar(cmbRecepcionProducto, productos, "Nombre", "IdProducto");
+            if (vista != null && TieneRecepcionPendiente && productoRecepcionActual > 0 && !productos.Any(p => p.IdProducto == productoRecepcionActual)) {
+                var anterior = productoBLL.Obtener(productoRecepcionActual);
+                if (anterior != null && vista.Orden.Detalles.Any(d => d.IdProducto == anterior.IdProducto)) productos.Add(anterior);
+            }
+            enlazandoRecepcion = true;
+            try { Enlazar(cmbRecepcionProducto, productos, "Nombre", "IdProducto"); }
+            finally { enlazandoRecepcion = false; }
+            productoRecepcionActual = cmbRecepcionProducto.SelectedValue is int ? (int)cmbRecepcionProducto.SelectedValue : 0;
             ActualizarSaldoRecepcion();
+        }
+
+        private void CambiarProductoRecepcion(object sender, EventArgs e)
+        {
+            if (enlazandoRecepcion) return;
+            int nuevo = cmbRecepcionProducto.SelectedValue is int ? (int)cmbRecepcionProducto.SelectedValue : 0;
+            if (nuevo != productoRecepcionActual && TieneRecepcionPendiente && !ConfirmarDescarte("la recepción preparada")) {
+                enlazandoRecepcion = true;
+                try { cmbRecepcionProducto.SelectedValue = productoRecepcionActual; } finally { enlazandoRecepcion = false; }
+                ActualizarSaldoRecepcion(); return;
+            }
+            if (nuevo != productoRecepcionActual) LimpiarRecepcion();
+            productoRecepcionActual = nuevo; ActualizarSaldoRecepcion();
+        }
+
+        private void LimpiarRecepcion()
+        {
+            txtLoteCodigo.Clear(); txtLoteOrigen.Clear(); NumeroRegional.Restablecer(nudLoteCantidad, 1);
+            dtpLoteVencimiento.Value = vencimientoInicial; dtpLoteVencimiento.Checked = true;
         }
 
         private void ActualizarSaldoRecepcion()
@@ -568,7 +632,14 @@ namespace UI.UserControls
             var producto = cmbRecepcionProducto.SelectedItem as Producto;
             var detalle = vista == null || producto == null ? null : vista.Orden.Detalles.FirstOrDefault(d => d.IdProducto == producto.IdProducto);
             int saldo = detalle == null ? 0 : detalle.Cantidad - detalle.CantidadRecibida;
+            // Una actualización externa puede reducir el saldo mientras se prepara la entrega.
+            // Conservar el texto permite señalar el exceso en lugar de aceptar el recorte de NumericUpDown.
+            string cantidadPreparada = TieneRecepcionPendiente ? nudLoteCantidad.Text : null;
             nudLoteCantidad.Maximum = Math.Max(1, saldo); nudLoteCantidad.Enabled = saldo > 0;
+            if (cantidadPreparada != null && nudLoteCantidad.Text != cantidadPreparada) {
+                nudLoteCantidad.Text = cantidadPreparada;
+                ((NumeroRegional)nudLoteCantidad).ValidarEntrada();
+            }
             if (registrarRecepcion != null) registrarRecepcion.Enabled = saldo > 0;
             saldoRecepcion.Text = detalle == null ? "No hay productos pendientes de recepción en la orden seleccionada." :
                 vista.Proveedor + " · " + producto.Nombre + " · Pedidas: " + detalle.Cantidad + " u. · Recibidas: " + detalle.CantidadRecibida + " u. · Pendientes: " + saldo + " u.";
@@ -610,6 +681,7 @@ namespace UI.UserControls
         {
             Ejecutar(delegate
             {
+                NumeroRegional.ExigirEntradas(nudCotizacionPrecio, nudCotizacionPlazo);
                 CotizacionProveedor cotizacion = new CotizacionProveedor
                 {
                     IdProveedor = ValorSeleccionado(cmbCotizacionProveedor),
@@ -632,23 +704,71 @@ namespace UI.UserControls
         {
             Ejecutar(delegate
             {
+                if (renglonesOrden.Rows.Count == 0 || nudOrdenPrecio.Value > 0 || nudOrdenCantidad.Value != 1 || EdicionNumerica(nudOrdenPrecio) || EdicionNumerica(nudOrdenCantidad))
+                    AgregarRenglonBorrador();
                 OrdenCompra orden = new OrdenCompra { IdProveedor = ValorSeleccionado(cmbOrdenProveedor) };
-                aprovisionamientoBLL.CrearOrdenPreliminar(orden, new List<DetalleOrdenCompra>
-                {
-                    new DetalleOrdenCompra
-                    {
-                        IdProducto = ValorSeleccionado(cmbOrdenProducto),
-                        Cantidad = Convert.ToInt32(nudOrdenCantidad.Value),
-                        PrecioUnitario = nudOrdenPrecio.Value
-                    }
-                });
-                CargarOrdenes();
-                LimpiarFiltrosOrdenes();
-                foreach (DataGridViewRow fila in dgvOrdenes.Rows)
-                    if (((OrdenCompraVista)fila.DataBoundItem).IdOrdenCompra == orden.IdOrdenCompra)
-                    { dgvOrdenes.CurrentCell = fila.Cells[0]; break; }
-                formularioOrden.Visible = false;
-            }, "Borrador de orden creado.");
+                var detalles = renglonesOrden.Rows.Cast<DataGridViewRow>().Select(f => new DetalleOrdenCompra {
+                    IdProducto = (int)f.Cells["IdProducto"].Value, Cantidad = (int)f.Cells["Cantidad"].Value, PrecioUnitario = (decimal)f.Cells["PrecioUnitario"].Value
+                }).ToList();
+                aprovisionamientoBLL.CrearOrdenPreliminar(orden, detalles);
+                LimpiarBorrador(); formularioOrden.Visible = false;
+                try {
+                    CargarOrdenes(); LimpiarFiltrosOrdenes();
+                    foreach (DataGridViewRow fila in dgvOrdenes.Rows)
+                        if (((OrdenCompraVista)fila.DataBoundItem).IdOrdenCompra == orden.IdOrdenCompra) { dgvOrdenes.CurrentCell = fila.Cells[0]; break; }
+                    Informar("Borrador #" + orden.IdOrdenCompra + " creado. Puede enviarlo a Contabilidad.");
+                } catch (Exception ex) { Informar("Borrador #" + orden.IdOrdenCompra + " creado. Actualice el listado: " + ex.Message); }
+            }, null);
+        }
+
+        protected virtual bool ConfirmarDescarte(string contexto)
+        {
+            return MessageBox.Show(this, "Hay datos sin guardar en " + contexto + ". ¿Desea descartarlos y continuar?", "Datos sin guardar",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        }
+
+        private void NuevoBorrador()
+        {
+            formularioOrden.Visible = true;
+            if (TieneBorradorPendiente && !ConfirmarDescarte("el borrador de compra")) return;
+            LimpiarBorrador();
+        }
+
+        private void CancelarBorrador()
+        {
+            if (TieneBorradorPendiente && !ConfirmarDescarte("el borrador de compra")) return;
+            LimpiarBorrador(); formularioOrden.Visible = false;
+        }
+
+        private void LimpiarBorrador()
+        {
+            renglonesOrden.Rows.Clear(); NumeroRegional.Restablecer(nudOrdenPrecio, 0); NumeroRegional.Restablecer(nudOrdenCantidad, 1);
+            ActualizarBorrador();
+        }
+
+        private void AgregarRenglonBorrador()
+        {
+            NumeroRegional.ExigirEntradas(nudOrdenCantidad, nudOrdenPrecio);
+            ValorSeleccionado(cmbOrdenProveedor);
+            var producto = cmbOrdenProducto.SelectedItem as Producto;
+            if (producto == null) throw new InvalidOperationException("Seleccione un perfume.");
+            if (nudOrdenPrecio.Value <= 0) throw new ArgumentException("El precio de compra debe ser mayor que cero.");
+            int cantidad = (int)nudOrdenCantidad.Value; decimal precio = nudOrdenPrecio.Value;
+            var fila = renglonesOrden.Rows.Cast<DataGridViewRow>().FirstOrDefault(f => (int)f.Cells["IdProducto"].Value == producto.IdProducto);
+            if (fila == null) renglonesOrden.Rows.Add(producto.IdProducto, producto.Nombre, cantidad, precio, cantidad * precio);
+            else { fila.Cells["Cantidad"].Value = cantidad; fila.Cells["PrecioUnitario"].Value = precio; fila.Cells["Subtotal"].Value = cantidad * precio; }
+            NumeroRegional.Restablecer(nudOrdenPrecio, 0); NumeroRegional.Restablecer(nudOrdenCantidad, 1);
+            ActualizarBorrador();
+        }
+
+        private void ActualizarBorrador()
+        {
+            int filas = renglonesOrden.Rows.Count;
+            renglonesOrden.Visible = filas > 0;
+            renglonesOrden.Height = Math.Min(120, 28 + filas * 24);
+            cmbOrdenProveedor.Enabled = filas == 0;
+            totalBorrador.Text = filas == 0 ? "Agregue los perfumes de esta compra." : filas + " producto(s) · Total: " +
+                FormatoPresentacion.Moneda(renglonesOrden.Rows.Cast<DataGridViewRow>().Sum(f => (decimal)f.Cells["Subtotal"].Value)) + " · Proveedor fijado para este borrador.";
         }
 
         private void EnviarRevision(object sender, EventArgs e)
@@ -685,6 +805,7 @@ namespace UI.UserControls
             if (orden == null) { MessageBox.Show("Seleccione una orden emitida."); return; }
             Ejecutar(delegate
             {
+                NumeroRegional.ExigirEntradas(nudLoteCantidad);
                 Lote lote = new Lote
                 {
                     IdProducto = ValorSeleccionado(cmbRecepcionProducto),
@@ -694,9 +815,12 @@ namespace UI.UserControls
                     FechaVencimiento = dtpLoteVencimiento.Checked ? (DateTime?)dtpLoteVencimiento.Value.Date : null
                 };
                 aprovisionamientoBLL.RecepcionarMercaderia(orden.IdOrdenCompra, new List<Lote> { lote });
-                CargarOrdenesRecepcion();
-                txtLoteCodigo.Clear(); txtLoteOrigen.Clear();
-            }, "Recepción registrada con trazabilidad de origen.");
+                LimpiarRecepcion();
+                try {
+                    CargarOrdenesRecepcion(); CargarOrdenes(); cmbInventarioProducto.SelectedValue = lote.IdProducto; CargarInventario();
+                    Informar("Recepción registrada. Stock y trazabilidad actualizados.");
+                } catch (Exception ex) { Informar("Recepción registrada. Actualice la consulta de stock: " + ex.Message); }
+            }, null);
         }
 
         private void ConsultarInventario(object sender, EventArgs e)
@@ -776,6 +900,7 @@ namespace UI.UserControls
 
         private static void AgregarCampo(FlowLayoutPanel panel, string etiqueta, Control control, int ancho)
         {
+            control.AccessibleName = etiqueta;
             FlowLayoutPanel bloque = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Margin = new Padding(3) };
             bloque.Controls.Add(new Label { Text = etiqueta, AutoSize = true });
             control.Width = ancho;

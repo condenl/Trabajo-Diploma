@@ -48,6 +48,93 @@ internal static class TestUsabilidadOperativa
         public MenuPrueba(Usuario actor) : base(actor) { }
         protected override bool ConfirmarDescartePendiente() { Consultas++; return Descartar; }
     }
+    private sealed class ComprasPrueba : UC_Aprovisionamiento {
+        public bool Descartar; public int Consultas;
+        public ComprasPrueba(Usuario actor) : base(actor) { ModoPrueba = true; }
+        protected override bool ConfirmarDescarte(string contexto) { Consultas++; return Descartar; }
+    }
+    private static void ComprobarPreparacionCompras(Form host, Usuario owner)
+    {
+        var compras = new ComprasPrueba(owner); Host(host, compras);
+        var tabs = compras.Controls.OfType<TabControl>().Single();
+        tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(t => t.Text == "Órdenes de compra");
+        var perfume = Find<ComboBox>(compras,"cmbOrdenProducto");
+        var proveedor = Find<ComboBox>(compras,"cmbOrdenProveedor");
+        var cantidad = Find<NumericUpDown>(compras,"nudOrdenCantidad");
+        var precio = Find<NumericUpDown>(compras,"nudOrdenPrecio");
+        var filas = Find<DataGridView>(compras,"dgvRenglonesOrden");
+        var productos = perfume.Items.Cast<Producto>().Take(2).ToArray();
+        int antes = Count("OrdenCompra"); Click(compras,"btnNuevoBorrador");
+        precio.Text = "12000.50"; Click(compras,"btnCrearOrden");
+        Assert(Count("OrdenCompra")==antes && filas.Rows.Count==0 && (compras.UltimoError ?? "").Contains("Formato"), "Un importe ambiguo no crea ni agrega una linea de compra");
+        precio.Text="12.000,50"; cantidad.Value=2; perfume.SelectedValue=productos[0].IdProducto;
+        Click(compras,"btnAgregarRenglonOrden");
+        Assert(filas.Rows.Count==1 && !proveedor.Enabled && compras.TieneCambiosPendientes, "Agregar perfume conserva un borrador pendiente y fija el proveedor");
+        Find<FlowLayoutPanel>(compras,"panelNuevaOrden").Visible=false;
+        Assert(compras.TieneCambiosPendientes, "Ocultar el editor no oculta sus cambios pendientes");
+        Click(compras,"btnNuevoBorrador");
+        Assert(compras.Consultas==1 && filas.Rows.Count==1, "Cancelar el descarte al pedir Nuevo conserva el borrador");
+        Click(compras,"btnCancelarNuevaOrden");
+        Assert(compras.Consultas==2 && filas.Rows.Count==1, "Cancelar el descarte al cerrar conserva las lineas preparadas");
+        compras.Descartar=true; Click(compras,"btnCancelarNuevaOrden"); Click(compras,"btnNuevoBorrador");
+        Assert(filas.Rows.Count==0 && cantidad.Value==1 && precio.Value==0 && proveedor.Enabled && !compras.TieneCambiosPendientes, "Confirmar descarte deja un nuevo borrador completamente limpio");
+        perfume.SelectedValue=productos[0].IdProducto; cantidad.Value=2; precio.Text="100,50"; Click(compras,"btnAgregarRenglonOrden");
+        perfume.SelectedValue=productos[1].IdProducto; cantidad.Value=3; precio.Text="200,00"; Click(compras,"btnAgregarRenglonOrden");
+        Assert(filas.Rows.Count==2 && filas.Rows.Cast<DataGridViewRow>().Sum(f=>(decimal)f.Cells["Subtotal"].Value)==801m, "Dos perfumes tienen cantidades, precios y total calculados por renglon");
+        perfume.SelectedValue=productos[0].IdProducto; cantidad.Value=4; precio.Text="100,50"; Click(compras,"btnAgregarRenglonOrden");
+        Assert(filas.Rows.Count==2 && (int)filas.Rows[0].Cells["Cantidad"].Value==4, "Actualizar un perfume reemplaza su renglon sin duplicarlo");
+        filas.CurrentCell=filas.Rows[1].Cells["Producto"]; Click(compras,"btnQuitarRenglonOrden");
+        Assert(filas.Rows.Count==1, "Quitar seleccionado retira solo el perfume elegido");
+        perfume.SelectedValue=productos[1].IdProducto; cantidad.Value=3; precio.Text="200,00";
+        Click(compras,"btnCrearOrden");
+        var bll=new AprovisionamientoBLL(); var orden=bll.ConsultarHistorialCompras(null).OrderByDescending(o=>o.IdOrdenCompra).First();
+        Assert(Count("OrdenCompra")==antes+1 && orden.Detalles.Count==2 && orden.Total==1002m && !compras.TieneCambiosPendientes,
+            "Crear incluye la ultima linea escrita y persiste una sola orden con los dos perfumes");
+        foreach(var ofertante in new ProveedorBLL().Listar(true).Take(2)) {
+            var oferta=new CotizacionProveedor { IdProveedor=ofertante.IdProveedor, FechaVigencia=DateTime.Today.AddDays(30) };
+            foreach(var p in productos) oferta.Detalles.Add(new DetalleCotizacionProveedor { IdProducto=p.IdProducto, PrecioUnitario=100, PlazoEntregaDias=3 });
+            bll.RegistrarCotizacion(oferta);
+        }
+        bll.EnviarOrdenARevisionContable(orden.IdOrdenCompra);
+        var contable=new UsuarioBLL().Login("demo.contabilidad@perfumeria.example","DemoContabilidad2026!");
+        bll.AprobarOrdenCompra(orden.IdOrdenCompra,contable.Id);
+        Session.Instance.Login(owner); bll.EmitirOrdenAprobada(orden.IdOrdenCompra);
+        tabs.SelectedTab=tabs.TabPages.Cast<TabPage>().Single(t=>t.Text=="Recepción e inventario"); Click(compras,"btnActualizarRecepcion");
+        var recepcion=Find<ComboBox>(compras,"cmbOrdenRecepcion"); recepcion.SelectedValue=orden.IdOrdenCompra;
+        var recibido=Find<ComboBox>(compras,"cmbRecepcionProducto"); recibido.SelectedValue=productos[0].IdProducto;
+        var lote=Find<TextBox>(compras,"txtLoteCodigo"); var origen=Find<TextBox>(compras,"txtLoteOrigen");
+        var unidades=Find<NumericUpDown>(compras,"nudLoteCantidad"); var vence=Find<DateTimePicker>(compras,"dtpLoteVencimiento");
+        unidades.Value=2; compras.Descartar=false; int preguntas=compras.Consultas;
+        recibido.SelectedValue=productos[1].IdProducto;
+        Assert((int)recibido.SelectedValue==productos[0].IdProducto && unidades.Value==2 && compras.Consultas==preguntas+1, "Cambiar solo cantidad ya protege la recepcion al elegir otro perfume");
+        lote.Text="TEST-RECEPCION-SEGURA"; origen.Text="Argentina";
+        int otra=recepcion.Items.Cast<object>().Select(o=>(int)o.GetType().GetProperty("IdOrdenCompra").GetValue(o,null)).First(id=>id!=orden.IdOrdenCompra);
+        recepcion.SelectedValue=otra;
+        Assert((int)recepcion.SelectedValue==orden.IdOrdenCompra && lote.Text=="TEST-RECEPCION-SEGURA" && origen.Text=="Argentina", "Rechazar cambio de orden conserva identidad, lote y origen");
+        Click(compras,"btnActualizarRecepcion");
+        Assert((int)recepcion.SelectedValue==orden.IdOrdenCompra && (int)recibido.SelectedValue==productos[0].IdProducto && lote.Text=="TEST-RECEPCION-SEGURA", "Actualizar conserva la recepcion preparada en su orden y perfume");
+        compras.Descartar=true; recibido.SelectedValue=productos[1].IdProducto;
+        Assert(lote.Text=="" && origen.Text=="" && unidades.Value==1, "Confirmar cambio de perfume limpia la preparacion anterior");
+        vence.Value=vence.Value.AddDays(1); preguntas=compras.Consultas; compras.Descartar=false; recepcion.SelectedValue=otra;
+        Assert((int)recepcion.SelectedValue==orden.IdOrdenCompra && compras.Consultas==preguntas+1, "Cambiar solo vencimiento tambien requiere confirmar el descarte");
+        compras.Descartar=true; recepcion.SelectedValue=otra; recepcion.SelectedValue=orden.IdOrdenCompra; recibido.SelectedValue=productos[0].IdProducto;
+        lote.Text="TEST-RECEPCION-SEGURA"; origen.Text="Argentina";
+        int stock=new InventarioBLL().VerificarStock(productos[0].IdProducto);
+        int lotes=Query("SELECT * FROM Lote WHERE IdProducto="+productos[0].IdProducto).Rows.Count;
+        Click(compras,"btnRegistrarRecepcion");
+        Assert(new InventarioBLL().VerificarStock(productos[0].IdProducto)==stock+1 && Find<Label>(compras,"lblStock").Text.EndsWith((stock+1).ToString()) &&
+            Find<DataGridView>(compras,"dgvTrazabilidad").Rows.Count==lotes+1 && lote.Text=="" && !compras.TieneCambiosPendientes,
+            "Registrar recepcion actualiza stock y trazabilidad visibles y limpia la preparacion");
+        unidades.Value=3; lote.Text="TEST-PREPARADO"; origen.Text="Argentina";
+        bll.RecepcionarMercaderia(orden.IdOrdenCompra,new System.Collections.Generic.List<Lote> {
+            new Lote { IdProducto=productos[0].IdProducto, CodigoLote="TEST-EXTERNO", Origen="Argentina", CantidadIngresada=2, FechaVencimiento=DateTime.Today.AddYears(1) }
+        });
+        Click(compras,"btnActualizarRecepcion"); int ingresos=Count("Lote");
+        Assert(unidades.Text=="3" && ((NumeroRegional)unidades).ErrorEntrada!=null && (int)recibido.SelectedValue==productos[0].IdProducto,
+            "Si otra recepcion reduce el saldo, Actualizar conserva el texto preparado y senala el exceso sin recortarlo");
+        Click(compras,"btnRegistrarRecepcion");
+        Assert(Count("Lote")==ingresos && (compras.UltimoError ?? "").Contains("entre"), "Una cantidad preparada que supera el nuevo saldo no registra otro lote");
+    }
     private static void Denegado(Action accion, string texto)
     { bool rechazo = false; try { accion(); } catch (UnauthorizedAccessException) { rechazo = true; } Assert(rechazo, texto); }
     private static void ComprobarRestricciones(FormPrincipal menu, string actor)
@@ -113,9 +200,12 @@ internal static class TestUsabilidadOperativa
                     Assert(numero.Text=="1.234,56", "Editor monetario uniforme con cultura " + cultura);
                     numero.Text="1.234,56"; Assert(numero.Value==1234.56m, "El editor interpreta separadores argentinos con cultura " + cultura);
                     numero.Text="9,50"; numero.UpButton(); Assert(numero.Value==10.50m, "Incrementar conserva el decimal con cultura " + cultura);
-                    numero.Text="no numerico"; decimal previo=numero.Value; Assert(previo==10.50m, "Entrada invalida conserva el valor con cultura " + cultura);
-                    numero.Maximum=1000; numero.Text="999999"; Assert(numero.Value==1000, "El editor conserva el limite maximo con cultura " + cultura);
-                    numero.Minimum=5; numero.Text="-100"; Assert(numero.Value==5, "El editor conserva el limite minimo con cultura " + cultura);
+                    numero.Text="no numerico"; Assert(!numero.ValidarEntrada() && numero.Value==10.50m && numero.Text=="no numerico", "Entrada invalida conserva texto y ultimo valor con cultura " + cultura);
+                    numero.Maximum=1000; numero.Text="999999"; Assert(!numero.ValidarEntrada() && numero.Value==10.50m && numero.Text=="999999", "El editor rechaza el exceso sin recortarlo al maximo con cultura " + cultura);
+                    numero.Minimum=5; numero.Text="-100"; Assert(!numero.ValidarEntrada() && numero.Value==10.50m && numero.Text=="-100", "El editor rechaza valores menores al minimo sin sustituirlos con cultura " + cultura);
+                    numero.Text="12000.50"; Assert(!numero.ValidarEntrada() && numero.Value==10.50m, "Un punto decimal ambiguo no se convierte en miles con cultura " + cultura);
+                    numero.Text="10,555"; Assert(!numero.ValidarEntrada(), "No se redondean silenciosamente decimales de mas con cultura " + cultura);
+                    NumeroRegional.Restablecer(numero,12.50m); Assert(numero.ErrorEntrada==null && numero.Text=="12,50", "Descartar la edicion restaura el formato y limpia el error con cultura " + cultura);
                 }
             }
         } finally { System.Globalization.CultureInfo.CurrentCulture=anterior; }
@@ -211,6 +301,7 @@ internal static class TestUsabilidadOperativa
                 var persisted = Query("SELECT TOP(1) Subtotal,Descuento,Total,IdCliente FROM Venta ORDER BY IdVenta DESC").Rows[0];
                 Assert(Count("Venta") == sales + 1 && (decimal)persisted[0] == cotizacion.Subtotal && (decimal)persisted[1] == cotizacion.Descuento && (decimal)persisted[2] == cotizacion.Total, "Importes confirmados coinciden con vista previa y membresia");
                 Assert(grid.Rows.Count == 0 && email.Text == "" && Field(ventas, "clienteActual") == null, "Venta finalizada prepara carrito e identidad limpios");
+                ComprobarPreparacionCompras(host, owner);
                 var compras = new UC_Aprovisionamiento(owner) { ModoPrueba = true }; Host(host, compras);
                 var orders = Find<DataGridView>(compras, "dgvOrdenes");
                 Assert(Find<DateTimePicker>(compras,"dtpOrdenDesde").Format==DateTimePickerFormat.Custom && Find<DateTimePicker>(compras,"dtpOrdenDesde").CustomFormat=="dd/MM/yyyy" &&

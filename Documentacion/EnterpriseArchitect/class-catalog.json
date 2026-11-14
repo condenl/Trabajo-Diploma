@@ -3035,6 +3035,14 @@
         "abstract": false
       },
       {
+        "name": "AgregarRenglonBorrador",
+        "type": "void",
+        "parameters": [],
+        "visibility": "Private",
+        "static": false,
+        "abstract": false
+      },
+      {
         "name": "EnviarRevision",
         "type": "void",
         "parameters": [

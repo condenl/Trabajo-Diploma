@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BE;
+using BE.Seguridad;
+using Servicios;
 using BE.Interfaces;
 using DAL.Interfaces;
 using BLL;
@@ -10,8 +12,24 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Arquitectura.Tests
 {
     [TestClass]
+    [DoNotParallelize]
     public class VentaBLLTests
     {
+        [TestInitialize]
+        public void IniciarActor() => SesionPruebas.Iniciar(TipoPermiso.Ventas_Registrar);
+        [TestCleanup]
+        public void CerrarActor() => Session.Instance.Logout();
+
+        [TestMethod]
+        [DataRow(0)] [DataRow(1)] [DataRow(2)]
+        public void Operaciones_ExigenSesionActivaYPermiso(int caso)
+        {
+            var fixture = new Fixture();
+            SesionPruebas.Restringir(caso, TipoPermiso.Ventas_Registrar);
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.RegistrarCliente(null!, true));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.CotizarVenta(null!));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.RegistrarVenta(null!));
+        }
         [TestMethod]
         public void RegistrarCliente_CreaMembresiaYPreferencias()
         {

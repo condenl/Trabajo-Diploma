@@ -171,7 +171,7 @@ namespace BLL
         private static void ExigirPermisoVenta()
         {
             Usuario usuario = Session.Instance.Usuario;
-            if (usuario != null && !usuario.TienePermiso(TipoPermiso.Ventas_Registrar))
+            if (usuario == null || !usuario.Activo || !usuario.TienePermiso(TipoPermiso.Ventas_Registrar))
                 throw new UnauthorizedAccessException("El usuario actual no posee permiso para registrar ventas o clientes.");
         }
     }

@@ -272,7 +272,7 @@ namespace BLL
         private static void ExigirPermiso(TipoPermiso permiso)
         {
             Usuario usuario = Session.Instance.Usuario;
-            if (usuario != null && !usuario.TienePermiso(permiso))
+            if (usuario == null || !usuario.Activo || !usuario.TienePermiso(permiso))
                 throw new UnauthorizedAccessException("El usuario actual no posee el permiso requerido: " + permiso + ".");
         }
     }

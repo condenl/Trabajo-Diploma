@@ -98,7 +98,7 @@ for name in ["IAprovisionamientoRepository", "IInventarioRepository", "IProducto
 for name in ["AprovisionamientoDAL", "InventarioDAL", "VentaDAL", "ProductoDAL", "ProveedorDAL"]:
     load_class(name, f"DAL/{name}.cs", ["InsertarLote", "InsertarMovimiento", "InsertarVenta", "InsertarDetalle"])
 for name in ["UC_Aprovisionamiento", "UC_Ventas"]:
-    load_class(name, f"UI/UserControls/{name}.cs", ["RegistrarCotizacion", "CrearOrden", "EnviarRevision", "AprobarOrden", "RechazarOrden", "EmitirOrden", "RegistrarRecepcion", "ConsultarInventario", "NuevoCliente", "BuscarCliente", "ConfirmarVenta", "ActualizarTotales", "Notificar", "MostrarError"])
+    load_class(name, f"UI/UserControls/{name}.cs", ["RegistrarCotizacion", "AgregarRenglonBorrador", "CrearOrden", "EnviarRevision", "AprobarOrden", "RechazarOrden", "EmitirOrden", "RegistrarRecepcion", "ConsultarInventario", "NuevoCliente", "BuscarCliente", "ConfirmarVenta", "ActualizarTotales", "Notificar", "MostrarError"])
 load_class('FormAltaCliente', 'UI/FormAltaCliente.cs', ['Guardar'])
 
 for name in ['SolicitudEvaluacion', 'DatosEvaluacion', 'OfertaEvaluable', 'ResultadoProveedor', 'EvaluacionProveedor', 'ResumenEvaluacion']:
@@ -220,7 +220,7 @@ class_view("G07-01", global_names, columns=5, links=normalize_links(global_links
 # Last represented nested call before returning from each non-leaf invocation.
 # Indices refer to the original call list, not to the expanded UML message list.
 SEQUENCE_ENDS = {
-    "N01-06a": {1:3, 4:6, 7:11, 10:11, 12:14, 13:14, 15:17, 16:17, 18:21, 19:20},
+    "N01-06a": {1:3, 5:8, 6:8, 9:13, 12:13, 14:16, 15:16, 17:19, 18:19, 20:23, 21:22},
     "N01-06b": {1:7, 4:6, 8:9, 10:11},
     "N02-06a": {1:7, 2:7},
     "N02-06b": {1:6, 2:6, 3:6, 7:15, 8:14, 10:13},
@@ -230,8 +230,8 @@ SEQUENCE_ENDS = {
 
 # Actor requests and observable outcomes surround the existing code realization.
 ACTOR_GROUPS = {
-    'N01-06a': [(1,3,'Dueño / Departamento de Compras','Registrar cotización','Cotización registrada'),(4,6,'Dueño / Departamento de Compras','Preparar orden','OrdenCompra'),(7,11,'Dueño / Departamento de Compras','Enviar a revisión','Estado de la orden'),(12,14,'Equipo de Contabilidad','Rechazar compra','Estado de la orden'),(15,17,'Equipo de Contabilidad','Aprobar compra','Estado de la orden'),(18,21,'Dueño / Departamento de Compras','Emitir orden aprobada','Estado de la orden')],
-    'N01-06b': [(1,7,'Recepción / Depósito','Confirmar recepción','Resultado de recepción'),(8,9,'Recepción / Depósito','Consultar existencias','int'),(10,11,'Recepción / Depósito','Consultar origen','Trazabilidad del lote')],
+    'N01-06a': [(1,3,'Dueño / Departamento de Compras','Registrar cotización','Cotización registrada'),(4,4,'Dueño / Departamento de Compras','Agregar o actualizar perfume','Borrador e importe actualizados'),(5,8,'Dueño / Departamento de Compras','Crear borrador con los perfumes elegidos','OrdenCompra'),(9,13,'Dueño / Departamento de Compras','Enviar a revisión','Estado de la orden'),(14,16,'Equipo de Contabilidad','Rechazar compra','Estado de la orden'),(17,19,'Equipo de Contabilidad','Aprobar compra','Estado de la orden'),(20,23,'Dueño / Departamento de Compras','Emitir orden aprobada','Estado de la orden')],
+    'N01-06b': [(1,11,'Recepción / Depósito','Confirmar recepción','Recepción, stock y trazabilidad actualizados')],
     'N02-06a': [(1,7,'Personal de Ventas','Registrar cliente y adhesión','Resultado del alta y membresía')],
     'N02-06b': [(1,6,'Personal de Ventas','Revisar productos, cliente e importes','Subtotal, descuento y total'),(7,15,'Personal de Ventas','Confirmar venta','Venta confirmada o motivo de rechazo')],
     'N02-06c': [(1,2,'Personal de Ventas','Registrar consentimiento','Resultado del registro'),(3,5,'Responsable de Marketing','Solicitar campaña autorizada','Resultado de campaña')],
@@ -259,7 +259,7 @@ def sequence(code, participants, calls, frames=(), notes=""):
         call = dict(source=a, target=b, name=name, kind="Sequence", sequence=len(d["links"])+1,
                     callId=i, isReturn=False, returnType=types.pop(),
                     proposed=bool(registry[b].get("proposed")))
-        if code.startswith('N02-06'):
+        if code.startswith(('N01-06','N02-06')):
             call['stateFlags'] = 'ForceActivation=1;'
         starts[i] = call["sequence"]
         d["links"].append(call)
@@ -278,7 +278,7 @@ def sequence(code, participants, calls, frames=(), notes=""):
         f["first"], f["last"] = starts[first], max(returns[i] for i in range(first, last+1))
         if len(f["guards"]) > 1:
             # N01 rejection ends before approval/emission starts.
-            f["size"] = 35 * (starts[15] - starts[first])
+            f["size"] = 35 * (starts[f.get('splitCall',15)] - starts[first])
     original = d['links']
     before, after = {}, {}
     actors = list(dict.fromkeys(g[2] for g in ACTOR_GROUPS[code]))
@@ -290,7 +290,7 @@ def sequence(code, participants, calls, frames=(), notes=""):
         target = calls[first-1][0]
         key = 'actor-'+str(first)
         before[starts[first]] = dict(source=actor,target=target,name=request,kind='Sequence',callId=key,isReturn=False,returnType=outcome,actorInteraction=True)
-        if code == 'N03-06' or code.startswith('N02-06'):
+        if code == 'N03-06' or code.startswith(('N01-06','N02-06')):
             before[starts[first]]['stateFlags'] = 'ForceActivation=1;'
         closing=max(returns[j] for j in range(first,last+1))
         after[closing] = dict(source=target,target=actor,name=outcome,kind='Sequence',replyTo=key,isReturn=True,returnType=outcome,actorInteraction=True)
@@ -306,7 +306,7 @@ def sequence(code, participants, calls, frames=(), notes=""):
         first,last=f['first'],f['last']
         f['first']=positions[first]-(1 if first in before else 0)
         f['last']=positions[last]+(1 if last in after else 0)
-        if len(f['guards'])>1: f['size']=35*(positions[starts[15]]-1-f['first'])
+        if len(f['guards'])>1: f['size']=35*(positions[starts[f.get('splitCall',15)]]-1-f['first'])
     d['links']=expanded
     nesting=[]
     for message in expanded:
@@ -324,14 +324,15 @@ def sequence(code, participants, calls, frames=(), notes=""):
 U, A, D, R = "UC_Aprovisionamiento", "AprovisionamientoBLL", "AprovisionamientoDAL", "RegistroActividadBitacora"
 sequence("N01-06a", [U, A, D, R], [
     (U,A,"RegistrarCotizacion"),(A,A,"ValidarCotizacion"),(A,D,"InsertarCotizacion"),
+    (U,U,"AgregarRenglonBorrador"),(U,U,"CrearOrden"),
     (U,A,"CrearOrdenPreliminar"),(A,A,"ValidarOrdenPreliminar"),(A,D,"InsertarOrden"),
     (U,A,"EnviarOrdenARevisionContable"),(A,D,"ObtenerOrden"),(A,D,"ContarProveedoresCotizadosPorProducto"),
     (A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),
     (U,A,"RechazarOrdenCompra"),(A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),
     (U,A,"AprobarOrdenCompra"),(A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),
     (U,A,"EmitirOrdenAprobada"),(A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),(A,R,"Registrar")],
-    [dict(kind=0, first=12, last=21, guards=["Rechazar", "Aprobar y emitir"], size=110)],
-    "Se omiten consultas repetidas y registros de bitácora intermedios. Antes de cambiar a PendienteAprobacion se exigen dos proveedores cotizados por producto; insuficiencia lanza InvalidOperationException. La UI ejecuta cada operación según el actor autorizado; Aprobar/Rechazar son excluyentes.")
+    [dict(kind=4, first=4, last=4, guards=["Por perfume agregado o actualizado"], size=70), dict(kind=0, first=14, last=23, guards=["Rechazar", "Aprobar y emitir"], size=110, splitCall=17)],
+    "AgregarRenglonBorrador valida formato, rango y precisión de cantidad/precio; actualiza una única línea por perfume y recalcula el total. CrearOrden entrega la lista completa a CrearOrdenPreliminar, que la guarda en una transacción. Nuevo/Cancelar solicitan confirmar el descarte si hay preparación pendiente. Se omiten consultas repetidas y bitácoras intermedias. Enviar a revisión exige dos proveedores cotizados por producto. Todas las escrituras exigen sesión activa con el permiso de la operación; Aprobar/Rechazar son excluyentes.")
 I = "InventarioBLL"
 sequence("N01-06b", [U,A,D,I,"InventarioDAL",R], [
     (U,A,"RecepcionarMercaderia"),(A,D,"ObtenerOrden"),(A,I,"ValidarLote"),
@@ -339,7 +340,7 @@ sequence("N01-06b", [U,A,D,I,"InventarioDAL",R], [
     (A,R,"Registrar"),(U,I,"VerificarStock"),(I,"InventarioDAL","VerificarStock"),
     (U,I,"ObtenerTrazabilidad"),(I,"InventarioDAL","ObtenerTrazabilidad")],
     [dict(kind=4, first=5, last=6, guards=["Por lote recibido"], size=70)],
-    "Los controles de pertenencia y cantidad se realizan dentro de RecepcionarMercaderia. RegistrarRecepcion usa una transacción y actualiza el estado parcial/completo; no llama a RegistrarIngresoLote. ConsultarInventario permite verificar stock y trazabilidad después de la recepción.")
+    "Los controles de pertenencia y cantidad se realizan dentro de RecepcionarMercaderia. RegistrarRecepcion usa una transacción y actualiza el estado parcial/completo; no llama a RegistrarIngresoLote. Al confirmar, la UI limpia la preparación y consulta automáticamente stock y trazabilidad del perfume recibido. Cambiar orden o perfume requiere confirmar el descarte de la preparación; Actualizar conserva su identidad y no transfiere datos a otra entrega. Sin sesión activa o permiso de recepción la BLL rechaza la operación antes de acceder a datos.")
 U,V,VD = "FormAltaCliente", "VentaBLL", "VentaDAL"
 sequence("N02-06a", [U,V,VD,R], [
     (U,U,"Guardar"),(U,V,"RegistrarCliente"),(V,V,"ValidarCliente"),(V,VD,"BuscarClientePorEmail"),(V,VD,"GuardarCliente"),
