@@ -93,7 +93,7 @@ namespace BLL
         private static void ExigirPermisoRecepcion()
         {
             Usuario usuario = Session.Instance.Usuario;
-            if (usuario != null && !usuario.TienePermiso(TipoPermiso.Inventario_Recepcionar))
+            if (usuario == null || !usuario.Activo || !usuario.TienePermiso(TipoPermiso.Inventario_Recepcionar))
                 throw new UnauthorizedAccessException("El usuario actual no posee permiso para gestionar inventario.");
         }
     }

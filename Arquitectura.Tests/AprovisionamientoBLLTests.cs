@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BE;
+using BE.Seguridad;
+using Servicios;
 using BE.Interfaces;
 using DAL.Interfaces;
 using BLL;
@@ -10,8 +12,28 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Arquitectura.Tests
 {
     [TestClass]
+    [DoNotParallelize]
     public class AprovisionamientoBLLTests
     {
+        [TestInitialize]
+        public void IniciarActor() => SesionPruebas.Iniciar(TipoPermiso.Aprovisionamiento_Gestion, TipoPermiso.Contabilidad_AprobarCompras, TipoPermiso.Inventario_Recepcionar);
+        [TestCleanup]
+        public void CerrarActor() => Session.Instance.Logout();
+
+        [TestMethod]
+        [DataRow(0)] [DataRow(1)] [DataRow(2)]
+        public void Operaciones_ExigenSesionActivaYPermisosAntesDeValidarOAccederAlRepositorio(int caso)
+        {
+            var fixture = new Fixture();
+            SesionPruebas.Restringir(caso, TipoPermiso.Aprovisionamiento_Gestion, TipoPermiso.Contabilidad_AprobarCompras, TipoPermiso.Inventario_Recepcionar);
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.RegistrarCotizacion(null!));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.CrearOrdenPreliminar(null!, null!));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.EnviarOrdenARevisionContable(1));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.AprobarOrdenCompra(1, 1));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.RechazarOrdenCompra(1, "motivo"));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.EmitirOrdenAprobada(1));
+            Assert.Throws<UnauthorizedAccessException>(() => fixture.Servicio.RecepcionarMercaderia(1, null!));
+        }
         [TestMethod]
         public void CrearOrdenPreliminar_RecalculaTotalYLaDejaEnBorrador()
         {

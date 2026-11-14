@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using BE;
+using BE.Seguridad;
+using Servicios;
 using BE.Interfaces;
 using DAL.Interfaces;
 using BLL;
@@ -9,8 +11,23 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Arquitectura.Tests
 {
     [TestClass]
+    [DoNotParallelize]
     public class InventarioBLLTests
     {
+        [TestInitialize]
+        public void IniciarActor() => SesionPruebas.Iniciar(TipoPermiso.Inventario_Recepcionar);
+        [TestCleanup]
+        public void CerrarActor() => Session.Instance.Logout();
+
+        [TestMethod]
+        [DataRow(0)] [DataRow(1)] [DataRow(2)]
+        public void Escrituras_ExigenSesionActivaYPermiso(int caso)
+        {
+            var servicio = new InventarioBLL(new FakeInventarioRepository(), new FakeRegistroActividad());
+            SesionPruebas.Restringir(caso, TipoPermiso.Inventario_Recepcionar);
+            Assert.Throws<UnauthorizedAccessException>(() => servicio.RegistrarIngresoLote(null!));
+            Assert.Throws<UnauthorizedAccessException>(() => servicio.DescontarStockLote(1, 1));
+        }
         [TestMethod]
         public void RegistrarIngresoLote_PermiteOmitirCertificado()
         {
