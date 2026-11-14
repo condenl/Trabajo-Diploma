@@ -30,6 +30,7 @@ namespace UI
             string[] etiquetas = { "Nombre *", "Apellido *", "Correo electrónico *", "Teléfono", "Preferencias olfativas", "Marketing", "Membresía", "Descuento (%)" };
             Control[] controles = { nombre, apellido, email, telefono, preferencias, marketing, membresia, descuento };
             for (int i = 0; i < controles.Length; i++) {
+                controles[i].AccessibleName = etiquetas[i];
                 campos.RowCount++; campos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                 campos.Controls.Add(new Label { Text = etiquetas[i], AutoSize = true, Margin = new Padding(0, 9, 6, 9) }, 0, i);
                 controles[i].Dock = DockStyle.Fill; controles[i].Margin = new Padding(0, 7, 0, 7); campos.Controls.Add(controles[i], 1, i);
@@ -54,6 +55,7 @@ namespace UI
         }
         private void Guardar() {
             try {
+                if (membresia.Checked) NumeroRegional.ExigirEntradas(descuento);
                 ExigirPermiso(); var cliente = new Cliente { Nombre = nombre.Text.Trim(), Apellido = apellido.Text.Trim(), Email = email.Text.Trim(),
                     Telefono = telefono.Text.Trim(), PreferenciasOlfativas = preferencias.Text.Trim(), AutorizaMarketing = marketing.Checked };
                 new VentaBLL().RegistrarCliente(cliente, membresia.Checked, descuento.Value);

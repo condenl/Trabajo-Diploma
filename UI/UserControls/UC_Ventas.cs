@@ -20,7 +20,7 @@ namespace UI.UserControls
         private Venta cotizacion;
         private readonly TextBox txtEmail = new TextBox { Name = "txtEmail", Width = 245 };
         private readonly ComboBox cmbProducto = new ComboBox { Name = "cmbProducto", DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
-        private readonly NumericUpDown nudCantidad = new NumeroRegional { Name = "nudCantidad", Minimum = 1, Maximum = 999, Value = 1, Width = 75 };
+        private readonly NumericUpDown nudCantidad = new NumeroRegional { Name = "nudCantidad", AccessibleName = "Cantidad", Minimum = 1, Maximum = 999, Value = 1, Width = 75 };
         private readonly DataGridView grilla = new DataGridView { Name = "dgvVenta", Dock = DockStyle.Fill, ReadOnly = true,
             AllowUserToAddRows = false, AllowUserToDeleteRows = false, MultiSelect = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize };
@@ -109,6 +109,7 @@ namespace UI.UserControls
         private void AgregarProducto(object sender, EventArgs e)
         {
             Ejecutar(delegate {
+                NumeroRegional.ExigirEntradas(nudCantidad);
                 var p = cmbProducto.SelectedItem as Producto; if (p == null) return;
                 var fila = grilla.Rows.Cast<DataGridViewRow>().FirstOrDefault(r => (int)r.Cells["IdProducto"].Value == p.IdProducto);
                 int cantidad = (fila == null ? 0 : (int)fila.Cells["Cantidad"].Value) + (int)nudCantidad.Value;

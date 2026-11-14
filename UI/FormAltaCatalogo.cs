@@ -34,6 +34,7 @@ namespace UI
         }
         protected void Campo(string etiqueta, Control control)
         {
+            control.AccessibleName = etiqueta;
             int fila = campos.RowCount++;
             campos.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             campos.Controls.Add(new Label { Text = etiqueta, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 10, 8, 10) }, 0, fila);
@@ -68,6 +69,7 @@ namespace UI
         }
         protected override void GuardarRegistro()
         {
+            NumeroRegional.ExigirEntradas(antiguedad, prestigio);
             new ProveedorBLL().Guardar(new Proveedor { RazonSocial = razon.Text.Trim(), Cuit = cuit.Text.Trim(), Contacto = contacto.Text.Trim(),
                 AntiguedadMercado = (int)antiguedad.Value, IndicePrestigio = prestigio.Value });
         }
@@ -88,6 +90,7 @@ namespace UI
         }
         protected override void GuardarRegistro()
         {
+            NumeroRegional.ExigirEntradas(precio, minimo);
             new ProductoBLL().Guardar(new Producto { Codigo = codigo.Text.Trim(), Nombre = nombre.Text.Trim(), Marca = marca.Text.Trim(),
                 FamiliaOlfativa = familia.Text.Trim(), PrecioVenta = precio.Value, StockMinimo = (int)minimo.Value });
         }

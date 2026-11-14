@@ -112,7 +112,7 @@ namespace UI.UserControls
         private static NumericUpDown Numero(string nombre, int min, int max, int valor) { return new NumeroRegional { Name = nombre, Minimum = min, Maximum = max, Value = valor, Width = 80 }; }
         private static FlowLayoutPanel Flujo() { return new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Padding = new Padding(1) }; }
         private static void Campo(FlowLayoutPanel panel, string etiqueta, Control control)
-        { var campo = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(3, 2, 6, 3) }; campo.Controls.Add(new Label { Text = etiqueta, AutoSize = true }); campo.Controls.Add(control); panel.Controls.Add(campo); }
+        { control.AccessibleName = etiqueta; var campo = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(3, 2, 6, 3) }; campo.Controls.Add(new Label { Text = etiqueta, AutoSize = true }); campo.Controls.Add(control); panel.Controls.Add(campo); }
         private Button Boton(string texto, string nombre, Action accion) { var b = new Button { Text = texto, Name = nombre, AutoSize = true, Padding = new Padding(4, 3, 4, 3), Margin = new Padding(4, 18, 4, 3) }; b.Click += delegate { Ejecutar(accion); }; return b; }
         private static Label Tarjeta(string nombre, string titulo) { return new Label { Name = nombre, Text = titulo + "\n—", Width = 165, Height = 56, Padding = new Padding(8, 5, 8, 5), Margin = new Padding(3), BackColor = TemaAplicacion.AcentoSuave, ForeColor = TemaAplicacion.Texto, Font = new Font("Segoe UI", 10, FontStyle.Bold) }; }
         private static Chart Grafico(string nombre, string titulo)
@@ -198,6 +198,7 @@ namespace UI.UserControls
         }
         private void Comparar()
         {
+            NumeroRegional.ExigirEntradas(cantidad, precio, prestigio, antiguedad);
             bool conservar = actual == null || !actual.IdProveedorSeleccionado.HasValue;
             string fundamento = conservar ? motivo.Text : "";
             int? eleccion = conservar ? proveedorBorrador ?? proveedorSeleccionado : null;
@@ -213,13 +214,13 @@ namespace UI.UserControls
             int sugerida = actual.CantidadSugerida;
             if (sugerida <= 0) { estado.Text = "No se sugiere reponer: el stock y las compras pendientes cubren el objetivo."; return; }
             if (actual.IdProveedorSeleccionado.HasValue) { estado.Text = "La decisión está guardada. Inicie otra comparación para cambiar la cantidad."; return; }
-            cantidad.Value = sugerida; Comparar();
+            NumeroRegional.Restablecer(cantidad, sugerida); Comparar();
             estado.Text = "Se compararon las ofertas para la cantidad sugerida: " + sugerida + " u. Revise el proveedor antes de confirmar.";
         }
         private void Mostrar(EvaluacionProveedor e)
         {
             cargando = true;
-            try { cantidad.Value = e.Solicitud.Cantidad; precio.Value = e.Solicitud.PesoPrecio; prestigio.Value = e.Solicitud.PesoPrestigio; antiguedad.Value = e.Solicitud.PesoAntiguedad; }
+            try { NumeroRegional.Restablecer(cantidad, e.Solicitud.Cantidad); NumeroRegional.Restablecer(precio, e.Solicitud.PesoPrecio); NumeroRegional.Restablecer(prestigio, e.Solicitud.PesoPrestigio); NumeroRegional.Restablecer(antiguedad, e.Solicitud.PesoAntiguedad); }
             finally { cargando = false; }
             actual = e; proveedorSeleccionado = proveedorBorrador = null; grilla.BindingContext = BindingContext; grilla.DataSource = e.Resultados; motivo.Text = e.MotivoSeleccion ?? "";
             stock.Text = "Stock utilizable\n" + e.Datos.StockDisponible + " u."; pendientes.Text = "Por recibir\n" + e.Datos.ComprasPendientes + " u.";
