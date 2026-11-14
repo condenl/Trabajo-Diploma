@@ -146,13 +146,33 @@ Verificación: `dotnet test Arquitectura.Tests/Arquitectura.Tests.csproj --confi
 
 ## Preparar compras y recepciones para la demo
 
-En **Órdenes de compra → Nuevo borrador**, elegir proveedor y agregar los perfumes con **Agregar / actualizar producto**. La tabla muestra cantidad, precio y subtotal por perfume; agregar nuevamente el mismo perfume actualiza su línea. **Quitar seleccionado** retira una línea y **Crear borrador** guarda la compra completa. El proveedor queda fijo mientras haya líneas. **Nuevo borrador** y **Cancelar** piden confirmar antes de descartar una preparación.
+En **Órdenes de compra → Nuevo borrador**, elegir proveedor y agregar los perfumes con **Agregar producto**. La tabla muestra cantidad, precio y subtotal por perfume. Seleccionar una línea recupera sus datos y cambia la acción a **Actualizar renglón**; **Otro perfume** prepara campos limpios para agregar otra línea. **Quitar seleccionado** retira una línea y **Crear borrador** guarda la compra completa. El proveedor queda fijo mientras haya líneas. **Nuevo borrador** y **Cancelar** piden confirmar antes de descartar una preparación.
 
 Los importes usan coma decimal: `12.000,50` o `12000,50`. El editor conserva y señala entradas inválidas, fuera de rango o con demasiados decimales; una entrada como `12000.50` se rechaza. No se reemplaza silenciosamente por otro importe ni se permite guardar hasta corregirla.
 
 En **Recepción e inventario**, cambiar de orden o perfume con datos preparados requiere confirmar su descarte. **Actualizar** conserva el contexto de la entrega y señala si una recepción de otro operador redujo su saldo. Al registrar el ingreso se muestran inmediatamente las existencias y la trazabilidad del perfume recibido. Las escrituras de Compras, Depósito y Ventas requieren una sesión activa y el permiso del actor.
 
 Validación reproducible: `powershell -NoProfile -File Scripts/test-usabilidad-operativa.ps1 -ServerInstance "DESKTOP-TFHVP49"` (o `"(localdb)\MSSQLLocalDB"`). Crea una base aislada; no modifica la configuración de desarrollo. Evidencia: [Verificacion_Demo_Compras.md](Documentacion/Verificacion_Demo_Compras.md).
+
+En **Ventas**, cambiar de perfume y finalizar una venta restablecen la cantidad a 1. **Actualizar** conserva la cantidad si sigue seleccionado el mismo perfume. **Nueva venta** permite descartar una preparación con confirmación; conserva todos los datos si se cancela el descarte. Las pantallas de Compras y N03 permiten desplazamiento vertical para mantener utilizables las tablas, gráficos y acciones en ventanas pequeñas.
+
+### Copia independiente para ensayar
+
+Desde el repositorio compilado, ejecutar:
+
+```powershell
+powershell -NoProfile -File Scripts/preparar-ensayo-demo.ps1 -ServerInstance "."
+```
+
+También admite `"(localdb)\MSSQLLocalDB"`. Crea una base nueva `Perfumeria_Ensayo_<identificador>`, una copia ejecutable en `%LOCALAPPDATA%\Perfumeria\Ensayos` y un respaldo inicial verificado. Informa las rutas **APLICACION** (el `UI.exe` que debe abrirse) y **SESION** (`sesion-demo.json`). Usa los mismos actores y contraseñas indicados en este README. La configuración de desarrollo conserva su conexión.
+
+Para repetir la demo, cerrar esa copia y ejecutar:
+
+```powershell
+powershell -NoProfile -File Scripts/preparar-ensayo-demo.ps1 -Modo Reiniciar -Sesion "RUTA_DEL_ARCHIVO_SESION"
+```
+
+Restaura exclusivamente la base identificada y marcada como perteneciente a esa sesión. Recupera compras, ventas, stock, evaluaciones y fechas del punto inicial; no vuelve a ejecutar la precarga ni recalcula los resultados históricos. El respaldo lo administra SQL Server en su carpeta local. Para un ensayo en otra fecha, **Crear** prepara una copia nueva con sus escenarios actuales. `Scripts/test-ensayo-demo.ps1 -ServerInstance "."` comprueba el ciclo en otra copia nueva, incluyendo dos restauraciones y el rechazo de un destino ajeno.
 
 ## N03: evaluación de proveedores
 

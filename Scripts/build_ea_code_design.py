@@ -98,7 +98,7 @@ for name in ["IAprovisionamientoRepository", "IInventarioRepository", "IProducto
 for name in ["AprovisionamientoDAL", "InventarioDAL", "VentaDAL", "ProductoDAL", "ProveedorDAL"]:
     load_class(name, f"DAL/{name}.cs", ["InsertarLote", "InsertarMovimiento", "InsertarVenta", "InsertarDetalle"])
 for name in ["UC_Aprovisionamiento", "UC_Ventas"]:
-    load_class(name, f"UI/UserControls/{name}.cs", ["RegistrarCotizacion", "AgregarRenglonBorrador", "CrearOrden", "EnviarRevision", "AprobarOrden", "RechazarOrden", "EmitirOrden", "RegistrarRecepcion", "ConsultarInventario", "NuevoCliente", "BuscarCliente", "ConfirmarVenta", "ActualizarTotales", "Notificar", "MostrarError"])
+    load_class(name, f"UI/UserControls/{name}.cs", ["RegistrarCotizacion", "EditarRenglonBorrador", "AgregarRenglonBorrador", "CrearOrden", "EnviarRevision", "AprobarOrden", "RechazarOrden", "EmitirOrden", "RegistrarRecepcion", "ConsultarInventario", "NuevoCliente", "BuscarCliente", "NuevaVenta", "LimpiarVenta", "ConfirmarDescarteVenta", "ConfirmarVenta", "ActualizarTotales", "Notificar", "MostrarError"])
 load_class('FormAltaCliente', 'UI/FormAltaCliente.cs', ['Guardar'])
 
 for name in ['SolicitudEvaluacion', 'DatosEvaluacion', 'OfertaEvaluable', 'ResultadoProveedor', 'EvaluacionProveedor', 'ResumenEvaluacion']:
@@ -220,20 +220,20 @@ class_view("G07-01", global_names, columns=5, links=normalize_links(global_links
 # Last represented nested call before returning from each non-leaf invocation.
 # Indices refer to the original call list, not to the expanded UML message list.
 SEQUENCE_ENDS = {
-    "N01-06a": {1:3, 5:8, 6:8, 9:13, 12:13, 14:16, 15:16, 17:19, 18:19, 20:23, 21:22},
+    "N01-06a": {1:3, 6:9, 7:9, 10:14, 13:14, 15:17, 16:17, 18:20, 19:20, 21:24, 22:23},
     "N01-06b": {1:7, 4:6, 8:9, 10:11},
     "N02-06a": {1:7, 2:7},
-    "N02-06b": {1:6, 2:6, 3:6, 7:15, 8:14, 10:13},
+    "N02-06b": {1:6, 2:6, 3:6, 7:16, 8:14, 10:13, 17:19},
     "N02-06c": {1:2},
     "N03-06": {1:8,2:8,5:6,7:8,9:15,10:15,12:15,13:15,16:23,17:22,18:22,19:21},
 }
 
 # Actor requests and observable outcomes surround the existing code realization.
 ACTOR_GROUPS = {
-    'N01-06a': [(1,3,'Dueño / Departamento de Compras','Registrar cotización','Cotización registrada'),(4,4,'Dueño / Departamento de Compras','Agregar o actualizar perfume','Borrador e importe actualizados'),(5,8,'Dueño / Departamento de Compras','Crear borrador con los perfumes elegidos','OrdenCompra'),(9,13,'Dueño / Departamento de Compras','Enviar a revisión','Estado de la orden'),(14,16,'Equipo de Contabilidad','Rechazar compra','Estado de la orden'),(17,19,'Equipo de Contabilidad','Aprobar compra','Estado de la orden'),(20,23,'Dueño / Departamento de Compras','Emitir orden aprobada','Estado de la orden')],
+    'N01-06a': [(1,3,'Dueño / Departamento de Compras','Registrar cotización','Cotización registrada'),(4,4,'Dueño / Departamento de Compras','Seleccionar renglón para corregir','Perfume, cantidad y precio recuperados'),(5,5,'Dueño / Departamento de Compras','Agregar o actualizar perfume','Borrador e importe actualizados'),(6,9,'Dueño / Departamento de Compras','Crear borrador con los perfumes elegidos','OrdenCompra'),(10,14,'Dueño / Departamento de Compras','Enviar a revisión','Estado de la orden'),(15,17,'Equipo de Contabilidad','Rechazar compra','Estado de la orden'),(18,20,'Equipo de Contabilidad','Aprobar compra','Estado de la orden'),(21,24,'Dueño / Departamento de Compras','Emitir orden aprobada','Estado de la orden')],
     'N01-06b': [(1,11,'Recepción / Depósito','Confirmar recepción','Recepción, stock y trazabilidad actualizados')],
     'N02-06a': [(1,7,'Personal de Ventas','Registrar cliente y adhesión','Resultado del alta y membresía')],
-    'N02-06b': [(1,6,'Personal de Ventas','Revisar productos, cliente e importes','Subtotal, descuento y total'),(7,15,'Personal de Ventas','Confirmar venta','Venta confirmada o motivo de rechazo')],
+    'N02-06b': [(1,6,'Personal de Ventas','Revisar productos, cliente e importes','Subtotal, descuento y total'),(7,16,'Personal de Ventas','Confirmar venta','Venta confirmada o motivo de rechazo'),(17,19,'Personal de Ventas','Solicitar una nueva venta','Venta nueva o preparación conservada')],
     'N02-06c': [(1,2,'Personal de Ventas','Registrar consentimiento','Resultado del registro'),(3,5,'Responsable de Marketing','Solicitar campaña autorizada','Resultado de campaña')],
     'N03-06': [(1,8,'Dueño / Departamento de Compras','Comparar proveedores','Comparación guardada / error'),
         (9,15,'Dueño / Departamento de Compras','Confirmar proveedor','Decisión fundamentada / error'),
@@ -324,15 +324,15 @@ def sequence(code, participants, calls, frames=(), notes=""):
 U, A, D, R = "UC_Aprovisionamiento", "AprovisionamientoBLL", "AprovisionamientoDAL", "RegistroActividadBitacora"
 sequence("N01-06a", [U, A, D, R], [
     (U,A,"RegistrarCotizacion"),(A,A,"ValidarCotizacion"),(A,D,"InsertarCotizacion"),
-    (U,U,"AgregarRenglonBorrador"),(U,U,"CrearOrden"),
+    (U,U,"EditarRenglonBorrador"),(U,U,"AgregarRenglonBorrador"),(U,U,"CrearOrden"),
     (U,A,"CrearOrdenPreliminar"),(A,A,"ValidarOrdenPreliminar"),(A,D,"InsertarOrden"),
     (U,A,"EnviarOrdenARevisionContable"),(A,D,"ObtenerOrden"),(A,D,"ContarProveedoresCotizadosPorProducto"),
     (A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),
     (U,A,"RechazarOrdenCompra"),(A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),
     (U,A,"AprobarOrdenCompra"),(A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),
     (U,A,"EmitirOrdenAprobada"),(A,A,"CambiarEstado"),(A,D,"ActualizarEstado"),(A,R,"Registrar")],
-    [dict(kind=4, first=4, last=4, guards=["Por perfume agregado o actualizado"], size=70), dict(kind=0, first=14, last=23, guards=["Rechazar", "Aprobar y emitir"], size=110, splitCall=17)],
-    "AgregarRenglonBorrador valida formato, rango y precisión de cantidad/precio; actualiza una única línea por perfume y recalcula el total. CrearOrden entrega la lista completa a CrearOrdenPreliminar, que la guarda en una transacción. Nuevo/Cancelar solicitan confirmar el descarte si hay preparación pendiente. Se omiten consultas repetidas y bitácoras intermedias. Enviar a revisión exige dos proveedores cotizados por producto. Todas las escrituras exigen sesión activa con el permiso de la operación; Aprobar/Rechazar son excluyentes.")
+    [dict(kind=1, first=4, last=4, guards=["Corregir un renglón existente"], size=70), dict(kind=4, first=5, last=5, guards=["Por perfume agregado o actualizado"], size=70), dict(kind=0, first=15, last=24, guards=["Rechazar", "Aprobar y emitir"], size=110, splitCall=18)],
+    "EditarRenglonBorrador recupera los valores al seleccionar la fila; la acción indica Actualizar renglón. AgregarRenglonBorrador valida formato, rango y precisión; agrega o reemplaza una única línea por perfume y prepara campos limpios para otra. CrearOrden entrega la lista completa a CrearOrdenPreliminar, que la guarda en una transacción. Nuevo/Cancelar solicitan confirmar el descarte si hay preparación pendiente. Se omiten consultas repetidas y bitácoras intermedias. Enviar a revisión exige dos proveedores cotizados por producto. Todas las escrituras exigen sesión activa con el permiso de la operación; Aprobar/Rechazar son excluyentes.")
 I = "InventarioBLL"
 sequence("N01-06b", [U,A,D,I,"InventarioDAL",R], [
     (U,A,"RecepcionarMercaderia"),(A,D,"ObtenerOrden"),(A,I,"ValidarLote"),
@@ -353,11 +353,15 @@ sequence("N02-06b", [U,V,VD,"ProductoDAL","InventarioDAL",R], [
     (V,"ProductoDAL","Obtener"),(V,"InventarioDAL","ObtenerLotesDisponibles"),
     (U,U,"ConfirmarVenta"),(U,V,"RegistrarVenta"),(V,V,"CalcularVenta"),
     (V,VD,"RegistrarVenta"),(VD,VD,"InsertarVenta"),(VD,VD,"InsertarDetalle"),
-    (VD,"InventarioDAL","InsertarMovimiento"),(V,R,"Registrar"),(U,U,"Notificar")],
+    (VD,"InventarioDAL","InsertarMovimiento"),(V,R,"Registrar"),(U,U,"LimpiarVenta"),(U,U,"Notificar"),
+    (U,U,"NuevaVenta"),(U,U,"ConfirmarDescarteVenta"),(U,U,"LimpiarVenta")],
     [dict(kind=1, first=4, last=4, guards=["IdCliente.HasValue"], size=50),
      dict(kind=4, first=5, last=6, guards=["Por producto"], size=70),
-     dict(kind=4, first=12, last=13, guards=["Por detalle FEFO"], size=70)],
-    "CotizarVenta comparte CalcularVenta con el registro y no escribe ventas ni stock. ConfirmarVenta vuelve a actualizar los importes; se omite esa repetición de ActualizarTotales. RegistrarVenta usa la sobrecarga con subtotalEsperado y descuentoEsperado, recalcula y rechaza diferencias antes de persistir. En su segundo CalcularVenta se repiten las consultas de membresía, producto y lotes ya detalladas en la vista previa. VentaDAL descuenta stock por SQL en su transacción. Al guardar se limpian carrito y cliente; los errores mantienen la venta en preparación y se muestran junto al formulario.")
+     dict(kind=4, first=12, last=13, guards=["Por detalle FEFO"], size=70),
+     dict(kind=0, first=7, last=19, guards=["Confirmar venta", "Iniciar otra venta"], splitCall=17, size=110),
+     dict(kind=1, first=18, last=18, guards=["Hay preparación pendiente"], size=70),
+     dict(kind=1, first=19, last=19, guards=["Descarte confirmado o sin preparación"], size=70)],
+    "CotizarVenta comparte CalcularVenta con el registro y no escribe ventas ni stock. ConfirmarVenta vuelve a actualizar los importes; se omite esa repetición. RegistrarVenta recalcula y rechaza diferencias antes de persistir. VentaDAL descuenta stock por SQL en su transacción. LimpiarVenta limpia carrito, cliente, cantidad e importes después de vender o de un descarte confirmado. NuevaVenta conserva la preparación si el actor rechaza descartarla y no registra ventas ni movimientos. Cambiar de perfume inicia la cantidad en uno; Actualizar conserva la cantidad si mantiene el perfume. Los errores mantienen la venta en preparación y se muestran junto al formulario.")
 U='FormAltaCliente'
 sequence("N02-06c", [U,V,VD,"MarketingBLL"], [
     (U,V,"RegistrarCliente"),(V,VD,"GuardarCliente"),

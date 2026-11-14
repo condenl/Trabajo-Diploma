@@ -53,6 +53,53 @@ internal static class TestUsabilidadOperativa
         public ComprasPrueba(Usuario actor) : base(actor) { ModoPrueba = true; }
         protected override bool ConfirmarDescarte(string contexto) { Consultas++; return Descartar; }
     }
+    private sealed class VentaPrueba : UC_Ventas {
+        public bool Descartar; public int Consultas;
+        protected override bool ConfirmarDescarteVenta() { Consultas++; return Descartar; }
+    }
+    private static void ComprobarNuevaVenta(Form host)
+    {
+        var vista = new VentaPrueba { ModoPrueba=true }; Host(host,vista);
+        var producto=Find<ComboBox>(vista,"cmbProducto"); var cantidad=Find<NumericUpDown>(vista,"nudCantidad");
+        cantidad.Value=7; producto.SelectedIndex=(producto.SelectedIndex+1)%producto.Items.Count;
+        Assert(cantidad.Value==1,"Elegir otro perfume reinicia la cantidad de venta en uno");
+        cantidad.Value=3; Click(vista,"btnActualizarVenta"); Assert(cantidad.Value==3,"Actualizar conserva la cantidad si conserva el perfume");
+        producto.SelectedValue=producto.Items.Cast<Producto>().Single(p=>p.Codigo=="DEMO-FLORAL").IdProducto;
+        Click(vista,"btnAgregarProducto"); var carrito=Find<DataGridView>(vista,"dgvVenta");
+        var correo=Find<TextBox>(vista,"txtEmail"); correo.Text="test.venta@example.com"; Click(vista,"btnBuscarCliente");
+        cantidad.Text="invalida"; int ventas=Count("Venta"), movimientos=Count("MovimientoStock");
+        Click(vista,"btnNuevaVenta");
+        Assert(vista.Consultas==1 && carrito.Rows.Count==1 && correo.Text!="" && cantidad.Text=="invalida", "Cancelar Nueva venta conserva carrito, cliente y edicion pendiente");
+        vista.Descartar=true; Click(vista,"btnNuevaVenta");
+        Assert(carrito.Rows.Count==0 && correo.Text=="" && cantidad.Value==1 && ((NumeroRegional)cantidad).ErrorEntrada==null && !vista.TieneCambiosPendientes && !Find<Button>(vista,"btnConfirmarVenta").Enabled,
+            "Nueva venta confirmada limpia carrito, identidad, cantidad, errores e importes");
+        Assert(Count("Venta")==ventas && Count("MovimientoStock")==movimientos,"Descartar una venta no escribe ventas ni movimientos");
+        int preguntas=vista.Consultas; Click(vista,"btnNuevaVenta"); Assert(vista.Consultas==preguntas,"Una venta vacia no pide confirmar el descarte");
+        correo.Text="correo.sin.buscar@example.com"; vista.Descartar=false; Click(vista,"btnNuevaVenta");
+        Assert(vista.Consultas==preguntas+1 && correo.Text!="", "El correo preparado sin carrito tambien se protege al iniciar una venta");
+        vista.Descartar=true; Click(vista,"btnNuevaVenta");
+    }
+    private static void ComprobarEspacioOperativo(Form host, Usuario owner)
+    {
+        Size anterior=host.ClientSize;
+        foreach(var size in new[]{new Size(810,430),new Size(1320,650)}) {
+            host.ClientSize=size; var vista=new UC_Aprovisionamiento(owner){ModoPrueba=true}; Host(host,vista);
+            var tabs=vista.Controls.OfType<TabControl>().Single(); tabs.SelectedTab=tabs.TabPages.Cast<TabPage>().Single(p=>p.Text=="Órdenes de compra");
+            Click(vista,"btnNuevoBorrador");
+            for(int i=0;i<3;i++){Find<ComboBox>(vista,"cmbOrdenProducto").SelectedIndex=i; Find<NumericUpDown>(vista,"nudOrdenPrecio").Value=100;Click(vista,"btnAgregarRenglonOrden");}
+            var ordenes=Find<DataGridView>(vista,"dgvOrdenes"); var scroll=Find<Panel>(vista,"scrollOrdenes");
+            Assert(ordenes.Height>=180 && scroll.VerticalScroll.Visible,"Compras conserva una grilla util y desplazamiento con tres perfumes: "+size);
+            scroll.ScrollControlIntoView(ordenes); Application.DoEvents();
+            Assert(scroll.ClientRectangle.IntersectsWith(scroll.RectangleToClient(ordenes.RectangleToScreen(ordenes.ClientRectangle))),"Se puede alcanzar el listado de compras mediante desplazamiento: "+size);
+            tabs.SelectedTab=tabs.TabPages.Cast<TabPage>().Single(p=>p.Text=="Evaluación de proveedores");
+            Click(vista,"btnCriteriosEvaluacion");Click(vista,"btnHistorialEvaluacion");
+            var resultados=Find<TabControl>(vista,"tabsResultadosEvaluacion");var scrollN03=Find<Panel>(vista,"scrollEvaluacion");
+            Assert(resultados.Height>=250,"Los resultados N03 no colapsan al abrir criterios e historial: "+size);
+            var confirmar=Find<Button>(vista,"btnConfirmarProveedor");scrollN03.ScrollControlIntoView(confirmar);Application.DoEvents();
+            Assert(scrollN03.ClientRectangle.Contains(scrollN03.RectangleToClient(confirmar.RectangleToScreen(confirmar.ClientRectangle))),"Los botones de decision N03 son alcanzables: "+size);
+        }
+        host.ClientSize=anterior;
+    }
     private static void ComprobarPreparacionCompras(Form host, Usuario owner)
     {
         var compras = new ComprasPrueba(owner); Host(host, compras);
@@ -81,8 +128,18 @@ internal static class TestUsabilidadOperativa
         perfume.SelectedValue=productos[0].IdProducto; cantidad.Value=2; precio.Text="100,50"; Click(compras,"btnAgregarRenglonOrden");
         perfume.SelectedValue=productos[1].IdProducto; cantidad.Value=3; precio.Text="200,00"; Click(compras,"btnAgregarRenglonOrden");
         Assert(filas.Rows.Count==2 && filas.Rows.Cast<DataGridViewRow>().Sum(f=>(decimal)f.Cells["Subtotal"].Value)==801m, "Dos perfumes tienen cantidades, precios y total calculados por renglon");
-        perfume.SelectedValue=productos[0].IdProducto; cantidad.Value=4; precio.Text="100,50"; Click(compras,"btnAgregarRenglonOrden");
+        filas.CurrentCell=filas.Rows[1].Cells["Producto"]; filas.CurrentCell=filas.Rows[0].Cells["Producto"];
+        Assert((int)perfume.SelectedValue==productos[0].IdProducto && cantidad.Value==2 && precio.Value==100.50m && Find<Button>(compras,"btnAgregarRenglonOrden").Text=="Actualizar renglón",
+            "Seleccionar un renglon recupera perfume, cantidad, precio y modo de actualizacion");
+        Click(compras,"btnActualizarOrdenes");
+        Assert((int)perfume.SelectedValue==productos[0].IdProducto && cantidad.Value==2 && precio.Value==100.50m,"Actualizar catalogos conserva el renglon que se estaba corrigiendo");
+        perfume.SelectedValue=productos[0].IdProducto;
+        Assert(filas.CurrentRow!=null && (int)filas.CurrentRow.Cells["IdProducto"].Value==productos[0].IdProducto && Find<Button>(compras,"btnQuitarRenglonOrden").Enabled,
+            "Elegir un perfume ya agregado selecciona su renglon y habilita quitarlo");
+        cantidad.Value=4; precio.Text="100,50"; Click(compras,"btnAgregarRenglonOrden");
         Assert(filas.Rows.Count==2 && (int)filas.Rows[0].Cells["Cantidad"].Value==4, "Actualizar un perfume reemplaza su renglon sin duplicarlo");
+        Assert(perfume.SelectedIndex==-1 && cantidad.Value==1 && precio.Value==0 && Find<Button>(compras,"btnAgregarRenglonOrden").Text=="Agregar producto","Guardar el renglon prepara otro perfume sin arrastrar sus valores");
+        Assert(!Find<Button>(compras,"btnQuitarRenglonOrden").Enabled && filas.CurrentRow==null,"Sin fila seleccionada no se permite quitar un renglon anterior");
         filas.CurrentCell=filas.Rows[1].Cells["Producto"]; Click(compras,"btnQuitarRenglonOrden");
         Assert(filas.Rows.Count==1, "Quitar seleccionado retira solo el perfume elegido");
         perfume.SelectedValue=productos[1].IdProducto; cantidad.Value=3; precio.Text="200,00";
@@ -273,6 +330,7 @@ internal static class TestUsabilidadOperativa
                     Assert(alta.DialogResult == DialogResult.OK && alta.ClienteCreado.IdCliente > 0 && Count("Cliente") == clients + 1, "Alta separada guarda cliente y membresia reales");
                 }
                 using (var alta = new FormAltaCliente()) { Click(alta, "btnCancelarCliente"); Assert(Count("Cliente") == clients + 1, "Cancelar alta de cliente no guarda"); }
+                ComprobarNuevaVenta(host); ComprobarEspacioOperativo(host,owner);
                 var ventas = new UC_Ventas { ModoPrueba = true }; Host(host, ventas);
                 Assert(!ventas.Controls.Find("txtNombre", true).Any() && !ventas.Controls.Find("chkMarketing", true).Any(), "Venta mantiene el alta de clientes fuera de la pantalla operativa");
                 var productos = Find<ComboBox>(ventas, "cmbProducto"); var floral = productos.Items.Cast<Producto>().Single(p => p.Codigo == "DEMO-FLORAL"); productos.SelectedValue = floral.IdProducto;
@@ -300,7 +358,7 @@ internal static class TestUsabilidadOperativa
                 email.Text = "test.venta@example.com"; Click(ventas, "btnBuscarCliente"); cotizacion = (Venta)Field(ventas, "cotizacion"); Click(ventas, "btnConfirmarVenta");
                 var persisted = Query("SELECT TOP(1) Subtotal,Descuento,Total,IdCliente FROM Venta ORDER BY IdVenta DESC").Rows[0];
                 Assert(Count("Venta") == sales + 1 && (decimal)persisted[0] == cotizacion.Subtotal && (decimal)persisted[1] == cotizacion.Descuento && (decimal)persisted[2] == cotizacion.Total, "Importes confirmados coinciden con vista previa y membresia");
-                Assert(grid.Rows.Count == 0 && email.Text == "" && Field(ventas, "clienteActual") == null, "Venta finalizada prepara carrito e identidad limpios");
+                Assert(grid.Rows.Count == 0 && email.Text == "" && Field(ventas, "clienteActual") == null && Find<NumericUpDown>(ventas,"nudCantidad").Value==1, "Venta finalizada prepara carrito, identidad y cantidad limpios");
                 ComprobarPreparacionCompras(host, owner);
                 var compras = new UC_Aprovisionamiento(owner) { ModoPrueba = true }; Host(host, compras);
                 var orders = Find<DataGridView>(compras, "dgvOrdenes");

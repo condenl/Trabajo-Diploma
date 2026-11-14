@@ -9,7 +9,8 @@ namespace UI.UserControls
 {
     public class UC_Ventas : UserControl, IVistaConCambiosPendientes
     {
-        public bool TieneCambiosPendientes { get { return grilla.Rows.Count > 0; } }
+        public bool TieneCambiosPendientes { get { return grilla.Rows.Count > 0 || !string.IsNullOrWhiteSpace(txtEmail.Text) ||
+            nudCantidad.Value != 1 || ((NumeroRegional)nudCantidad).TieneEdicionPendiente; } }
         public bool ModoPrueba { get; set; }
         public string UltimoMensaje { get; private set; }
         public string UltimoError { get; private set; }
@@ -29,6 +30,7 @@ namespace UI.UserControls
         private readonly Label resumen = Etiqueta("lblTotalesVenta", "");
         private readonly Label estado = Etiqueta("lblEstadoVenta", "");
         private Button confirmar;
+        private bool cargandoProductos;
 
         public UC_Ventas()
         {
@@ -60,13 +62,17 @@ namespace UI.UserControls
             layout.Controls.Add(grilla, 0, 4);
             var pie = Barra(); resumen.Font = new Font(Font, FontStyle.Bold); pie.Controls.Add(resumen);
             confirmar = Boton("Confirmar venta", "btnConfirmarVenta", ConfirmarVenta); pie.Controls.Add(confirmar);
+            pie.Controls.Add(Boton("Nueva venta", "btnNuevaVenta", delegate { NuevaVenta(); }));
             layout.Controls.Add(pie, 0, 5); layout.Controls.Add(estado, 0, 6); Controls.Add(layout);
             txtEmail.TextChanged += delegate {
                 if (clienteActual != null && !string.Equals(txtEmail.Text.Trim(), clienteActual.Email, StringComparison.OrdinalIgnoreCase))
                 { clienteActual = null; MostrarCliente(); ActualizarTotales(); }
             };
             txtEmail.KeyDown += delegate(object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; BuscarCliente(s, EventArgs.Empty); } };
-            cmbProducto.SelectedIndexChanged += delegate { Ejecutar(ActualizarStock); };
+            cmbProducto.SelectedIndexChanged += delegate {
+                if (!cargandoProductos) NumeroRegional.Restablecer(nudCantidad, 1);
+                Ejecutar(ActualizarStock);
+            };
             Ejecutar(CargarProductos); ActualizarTotales();
         }
         private static Label Etiqueta(string nombre, string texto) { return new Label { Name = nombre, Text = texto, AutoSize = true, Margin = new Padding(3, 7, 10, 7) }; }
@@ -75,8 +81,13 @@ namespace UI.UserControls
         private void CargarProductos()
         {
             var anterior = cmbProducto.SelectedItem as Producto;
-            cmbProducto.DisplayMember = "Nombre"; cmbProducto.ValueMember = "IdProducto"; cmbProducto.DataSource = productoBLL.Listar(true);
-            if (anterior != null && cmbProducto.Items.Cast<Producto>().Any(p => p.IdProducto == anterior.IdProducto)) cmbProducto.SelectedValue = anterior.IdProducto;
+            cargandoProductos = true;
+            try {
+                cmbProducto.DisplayMember = "Nombre"; cmbProducto.ValueMember = "IdProducto"; cmbProducto.DataSource = productoBLL.Listar(true);
+                if (anterior != null && cmbProducto.Items.Cast<Producto>().Any(p => p.IdProducto == anterior.IdProducto)) cmbProducto.SelectedValue = anterior.IdProducto;
+            } finally { cargandoProductos = false; }
+            if (anterior == null || !(cmbProducto.SelectedValue is int) || (int)cmbProducto.SelectedValue != anterior.IdProducto)
+                NumeroRegional.Restablecer(nudCantidad, 1);
             ActualizarStock();
         }
         private void ActualizarStock()
@@ -106,6 +117,20 @@ namespace UI.UserControls
         }
         private void MostrarCliente() { lblCliente.Text = clienteActual == null ? "Venta ocasional · sin cliente seleccionado" : "Cliente: " + clienteActual.NombreCompleto + " · " + clienteActual.Email; }
         private void QuitarCliente() { clienteActual = null; txtEmail.Clear(); MostrarCliente(); ActualizarTotales(); }
+        protected virtual bool ConfirmarDescarteVenta()
+        {
+            return MessageBox.Show(this, "Hay una venta sin guardar. ¿Desea descartarla y preparar una nueva?", "Nueva venta",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        }
+        private void NuevaVenta()
+        {
+            if (TieneCambiosPendientes && !ConfirmarDescarteVenta()) return;
+            Ejecutar(delegate { LimpiarVenta(); ActualizarStock(); Notificar("Nueva venta ocasional. Agregue los productos.", false); });
+        }
+        private void LimpiarVenta()
+        {
+            grilla.Rows.Clear(); NumeroRegional.Restablecer(nudCantidad, 1); QuitarCliente();
+        }
         private void AgregarProducto(object sender, EventArgs e)
         {
             Ejecutar(delegate {
@@ -153,7 +178,7 @@ namespace UI.UserControls
                     Notificar("Los importes cambiaron. Revise el total actualizado y vuelva a confirmar.", false); return;
                 }
                 var venta = CrearVenta(); ventaBLL.RegistrarVenta(venta, cotizacion.Subtotal, cotizacion.Descuento);
-                grilla.Rows.Clear(); QuitarCliente();
+                LimpiarVenta();
                 Notificar("Venta #" + venta.IdVenta + " registrada. Total: " + venta.Total.ToString("C2", FormatoPresentacion.Cultura) + ". Lista para una nueva venta ocasional.", false);
                 try { CargarProductos(); } catch (Exception ex) { Notificar("Venta #" + venta.IdVenta + " registrada. No se pudo refrescar el catálogo: " + ex.Message, true); }
             });

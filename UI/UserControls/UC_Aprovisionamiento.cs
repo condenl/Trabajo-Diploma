@@ -44,6 +44,8 @@ namespace UI.UserControls
         private Button registrarRecepcion;
         private readonly Label saldoRecepcion = new Label { Name = "lblSaldoRecepcion", AutoSize = true, Dock = DockStyle.Fill, Padding = new Padding(4, 8, 4, 8) };
         private FlowLayoutPanel formularioOrden;
+        private bool cargandoRenglon;
+        private Button agregarRenglon, quitarRenglon;
         private readonly DataGridView renglonesOrden = Grilla("dgvRenglonesOrden");
         private readonly Label totalBorrador = new Label { Name = "lblTotalBorrador", AutoSize = true, Margin = new Padding(4, 10, 4, 4) };
         private Button enviarRevision, emitirProveedor;
@@ -199,7 +201,11 @@ namespace UI.UserControls
 
         private void ConstruirOrdenes()
         {
-            TableLayoutPanel layout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 6, ColumnCount = 1, Padding = new Padding(12) };
+            var desplazamiento = new Panel { Name = "scrollOrdenes", Dock = DockStyle.Fill, AutoScroll = true };
+            TableLayoutPanel layout = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, RowCount = 6, ColumnCount = 1, Padding = new Padding(12) };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            dgvOrdenes.MinimumSize = new Size(0, 180);
+            desplazamiento.SizeChanged += delegate { layout.MinimumSize = new Size(0, desplazamiento.ClientSize.Height); };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -225,17 +231,31 @@ namespace UI.UserControls
             AgregarCampo(editor, "Perfume", cmbOrdenProducto, 210);
             AgregarCampo(editor, "Cantidad", nudOrdenCantidad, 85);
             AgregarCampo(editor, "Precio compra", nudOrdenPrecio, 105);
-            editor.Controls.Add(Boton("Agregar / actualizar producto", "btnAgregarRenglonOrden", delegate { Ejecutar(AgregarRenglonBorrador, null); }));
+            agregarRenglon = Boton("Agregar producto", "btnAgregarRenglonOrden", delegate { Ejecutar(AgregarRenglonBorrador, null); });
+            editor.Controls.Add(agregarRenglon);
+            editor.Controls.Add(Boton("Otro perfume", "btnNuevoRenglonOrden", delegate { PrepararRenglon(); }));
             renglonesOrden.Dock = DockStyle.None; renglonesOrden.Visible = false; renglonesOrden.Height = 72;
             renglonesOrden.Columns.Add("IdProducto", "Id"); renglonesOrden.Columns[0].Visible = false;
             renglonesOrden.Columns.Add("Producto", "Perfume"); renglonesOrden.Columns.Add("Cantidad", "Cantidad");
             renglonesOrden.Columns.Add("PrecioUnitario", "Precio unitario"); renglonesOrden.Columns.Add("Subtotal", "Subtotal");
             renglonesOrden.Columns["Producto"].FillWeight = 230;
             foreach (string col in new[] { "PrecioUnitario", "Subtotal" }) renglonesOrden.Columns[col].DefaultCellStyle.Format = "C2";
+            renglonesOrden.CellClick += delegate(object s, DataGridViewCellEventArgs e) { if (e.RowIndex >= 0) EditarRenglonBorrador(renglonesOrden.Rows[e.RowIndex]); };
+            renglonesOrden.CurrentCellChanged += delegate { if (!cargandoRenglon && renglonesOrden.CurrentRow != null) EditarRenglonBorrador(renglonesOrden.CurrentRow); };
+            cmbOrdenProducto.SelectedIndexChanged += delegate {
+                if (cargandoRenglon) return;
+                var fila = renglonesOrden.Rows.Cast<DataGridViewRow>().FirstOrDefault(f => cmbOrdenProducto.SelectedValue is int && (int)f.Cells["IdProducto"].Value == (int)cmbOrdenProducto.SelectedValue);
+                if (fila != null) EditarRenglonBorrador(fila);
+                else { NumeroRegional.Restablecer(nudOrdenCantidad, 1); NumeroRegional.Restablecer(nudOrdenPrecio, 0); agregarRenglon.Text = "Agregar producto"; }
+            };
             var accionesBorrador = FlujoHorizontal(); accionesBorrador.Controls.Add(totalBorrador);
-            accionesBorrador.Controls.Add(Boton("Quitar seleccionado", "btnQuitarRenglonOrden", delegate {
-                if (renglonesOrden.CurrentRow != null) renglonesOrden.Rows.Remove(renglonesOrden.CurrentRow); ActualizarBorrador();
-            }));
+            quitarRenglon = Boton("Quitar seleccionado", "btnQuitarRenglonOrden", delegate {
+                cargandoRenglon = true;
+                try { if (renglonesOrden.CurrentRow != null) renglonesOrden.Rows.Remove(renglonesOrden.CurrentRow); }
+                finally { cargandoRenglon = false; }
+                PrepararRenglon(); ActualizarBorrador();
+            });
+            quitarRenglon.Enabled = false; accionesBorrador.Controls.Add(quitarRenglon);
             accionesBorrador.Controls.Add(Boton("Crear borrador", "btnCrearOrden", CrearOrden));
             accionesBorrador.Controls.Add(Boton("Cancelar", "btnCancelarNuevaOrden", delegate { CancelarBorrador(); }));
             formularioOrden.Controls.Add(editor); formularioOrden.Controls.Add(renglonesOrden); formularioOrden.Controls.Add(accionesBorrador);
@@ -272,7 +292,7 @@ namespace UI.UserControls
             fechaDesde.ValueChanged += delegate { if (fechaDesde.Value.Date > fechaHasta.Value.Date) fechaHasta.Value = fechaDesde.Value; AplicarFiltrosOrdenes(); };
             fechaHasta.ValueChanged += delegate { if (fechaHasta.Value.Date < fechaDesde.Value.Date) fechaDesde.Value = fechaHasta.Value; AplicarFiltrosOrdenes(); };
             layout.Controls.Add(filtros, 0, 4); layout.Controls.Add(dgvOrdenes, 0, 5);
-            tabOrdenes.Controls.Add(layout);
+            desplazamiento.Controls.Add(layout); tabOrdenes.Controls.Add(desplazamiento);
         }
 
         private void ConstruirContabilidad()
@@ -368,7 +388,13 @@ namespace UI.UserControls
             Enlazar(cmbCotizacionProveedor, proveedores, "RazonSocial", "IdProveedor");
             Enlazar(cmbOrdenProveedor, proveedores.ToList(), "RazonSocial", "IdProveedor");
             Enlazar(cmbCotizacionProducto, productos, "Nombre", "IdProducto");
-            Enlazar(cmbOrdenProducto, productos.ToList(), "Nombre", "IdProducto");
+            var anterior = cmbOrdenProducto.SelectedItem as Producto;
+            bool conservarVacio = cmbOrdenProducto.Items.Count > 0 && anterior == null;
+            var opcionesOrden = productos.ToList();
+            if (anterior != null && TieneBorradorPendiente && !opcionesOrden.Any(p => p.IdProducto == anterior.IdProducto)) opcionesOrden.Add(anterior);
+            cargandoRenglon = true;
+            try { Enlazar(cmbOrdenProducto, opcionesOrden, "Nombre", "IdProducto"); if (conservarVacio) cmbOrdenProducto.SelectedIndex = -1; }
+            finally { cargandoRenglon = false; }
             Enlazar(cmbInventarioProducto, productos.ToList(), "Nombre", "IdProducto");
         }
 
@@ -742,8 +768,33 @@ namespace UI.UserControls
 
         private void LimpiarBorrador()
         {
-            renglonesOrden.Rows.Clear(); NumeroRegional.Restablecer(nudOrdenPrecio, 0); NumeroRegional.Restablecer(nudOrdenCantidad, 1);
+            cargandoRenglon = true;
+            try { renglonesOrden.Rows.Clear(); } finally { cargandoRenglon = false; }
+            PrepararRenglon();
+            if (cmbOrdenProducto.Items.Count > 0) cmbOrdenProducto.SelectedIndex = 0;
             ActualizarBorrador();
+        }
+
+        private void PrepararRenglon()
+        {
+            cargandoRenglon = true;
+            try { renglonesOrden.ClearSelection(); renglonesOrden.CurrentCell = null; cmbOrdenProducto.SelectedIndex = -1;
+                NumeroRegional.Restablecer(nudOrdenPrecio, 0); NumeroRegional.Restablecer(nudOrdenCantidad, 1);
+                agregarRenglon.Text = "Agregar producto";
+                quitarRenglon.Enabled = false;
+            } finally { cargandoRenglon = false; }
+        }
+
+        private void EditarRenglonBorrador(DataGridViewRow fila)
+        {
+            cargandoRenglon = true;
+            try { renglonesOrden.CurrentCell = fila.Cells["Producto"]; fila.Selected = true;
+                cmbOrdenProducto.SelectedValue = (int)fila.Cells["IdProducto"].Value;
+                NumeroRegional.Restablecer(nudOrdenCantidad, (int)fila.Cells["Cantidad"].Value);
+                NumeroRegional.Restablecer(nudOrdenPrecio, (decimal)fila.Cells["PrecioUnitario"].Value);
+                agregarRenglon.Text = "Actualizar renglón";
+                quitarRenglon.Enabled = true;
+            } finally { cargandoRenglon = false; }
         }
 
         private void AgregarRenglonBorrador()
@@ -755,9 +806,12 @@ namespace UI.UserControls
             if (nudOrdenPrecio.Value <= 0) throw new ArgumentException("El precio de compra debe ser mayor que cero.");
             int cantidad = (int)nudOrdenCantidad.Value; decimal precio = nudOrdenPrecio.Value;
             var fila = renglonesOrden.Rows.Cast<DataGridViewRow>().FirstOrDefault(f => (int)f.Cells["IdProducto"].Value == producto.IdProducto);
-            if (fila == null) renglonesOrden.Rows.Add(producto.IdProducto, producto.Nombre, cantidad, precio, cantidad * precio);
-            else { fila.Cells["Cantidad"].Value = cantidad; fila.Cells["PrecioUnitario"].Value = precio; fila.Cells["Subtotal"].Value = cantidad * precio; }
-            NumeroRegional.Restablecer(nudOrdenPrecio, 0); NumeroRegional.Restablecer(nudOrdenCantidad, 1);
+            cargandoRenglon = true;
+            try {
+                if (fila == null) renglonesOrden.Rows.Add(producto.IdProducto, producto.Nombre, cantidad, precio, cantidad * precio);
+                else { fila.Cells["Cantidad"].Value = cantidad; fila.Cells["PrecioUnitario"].Value = precio; fila.Cells["Subtotal"].Value = cantidad * precio; }
+            } finally { cargandoRenglon = false; }
+            PrepararRenglon();
             ActualizarBorrador();
         }
 
