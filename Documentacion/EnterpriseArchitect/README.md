@@ -85,3 +85,9 @@ python Scripts/verify_ea_document.py ANTES.docx DESPUES.docx --paragraph-replace
 ```
 
 Los documentos de revisión y respaldos locales no se incorporan al repositorio; se conservan el EAP, sus fuentes JSON, scripts, capturas nativas y evidencia de las verificaciones.
+
+## Preparación de compras y recepción
+
+La revisión del 14 de noviembre de 2026 actualiza `N01-06a` para mostrar la preparación de varios perfumes y el guardado de todos los detalles, y `N01-06b` para incluir la consulta automática de stock y trazabilidad antes de informar el resultado al actor. Los métodos internos, retornos y activaciones se contrastan con `code-design-routed.json` mediante `verify_ea_code_design.ps1`. Las entidades y relaciones del dominio no cambian.
+
+Las especificaciones abstractas de `CU-N01-01` y `CU-N01-03` se conservan en el Markdown de casos de uso, en las notas de EA y en sus tablas existentes de Google Docs. `demo-use-case-replacements.json` registra los siete reemplazos de párrafos; `verification-demo-document.json` comprueba que se conservaron los demás textos y las 27 capturas únicas, sin recortes ni duplicados. Las capturas nuevas se revisaron en su ubicación del PDF exportado por Google Docs.

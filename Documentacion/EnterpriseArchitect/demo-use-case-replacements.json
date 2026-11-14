@@ -1,0 +1,44 @@
+[
+  {
+    "code": "CU-N01-01",
+    "field": "Flujo Normal",
+    "old": "3. Compras informa las cotizaciones recibidas y selecciona proveedor, productos, cantidades y precios.",
+    "new": "3. Compras informa las cotizaciones recibidas, elige un proveedor y agrega o ajusta los productos, cantidades y precios de la compra."
+  },
+  {
+    "code": "CU-N01-01",
+    "field": "Flujo Normal",
+    "old": "4. El sistema muestra la orden en borrador con su importe total y señala los datos que requieren corrección.",
+    "new": "4. El sistema presenta el detalle de cada producto y el importe total del borrador, y señala los datos que requieren corrección."
+  },
+  {
+    "code": "CU-N01-01",
+    "field": "Excepciones",
+    "old": "E2: Cotización inválida. El sistema indica los datos inválidos o vencidos; Compras los corrige y vuelve a presentarlos.",
+    "new": "E2: Datos inválidos o preparación cancelada. El sistema identifica cotizaciones, cantidades o precios inválidos y solicita corregirlos. Si Compras pide iniciar otra compra o abandonar la preparación, solicita confirmar su descarte; si no lo confirma, conserva los datos."
+  },
+  {
+    "code": "CU-N01-03",
+    "field": "Flujo Normal",
+    "old": "7. Recepción solicita consultar las existencias y el origen de la mercadería ingresada.",
+    "new": "7. El sistema muestra las existencias actualizadas y la trazabilidad de la mercadería ingresada hacia el proveedor y la compra de origen."
+  },
+  {
+    "code": "CU-N01-03",
+    "field": "Flujo Normal",
+    "old": "8. El sistema muestra el stock actualizado y su trazabilidad hacia el proveedor y la compra de origen.",
+    "new": "8. Recepción verifica el resultado y puede preparar la siguiente entrega."
+  },
+  {
+    "code": "CU-N01-03",
+    "field": "Excepciones",
+    "old": "E2: Lote inválido. El sistema identifica los datos faltantes, la cantidad no positiva o el vencimiento inválido; Recepción los corrige.",
+    "new": "E2: Preparación inválida o cambio de entrega. El sistema identifica los datos de lote, cantidad o vencimiento que deben corregirse. Si Recepción cambia la orden o el producto con datos preparados, solicita confirmar su descarte; si no lo confirma, conserva la entrega original."
+  },
+  {
+    "code": "CU-N01-03",
+    "field": "Excepciones",
+    "old": "E3: Diferencia inválida. El sistema informa el producto ajeno a la orden o la cantidad que supera lo pendiente; Recepción revisa la entrega y vuelve a presentarla.",
+    "new": "E3: Diferencia en cantidades. El sistema identifica un producto ajeno a la orden o una cantidad superior a lo pendiente, incluso si otra recepción cambió el saldo; conserva los datos para que Recepción revise la entrega antes de reintentar."
+  }
+]
