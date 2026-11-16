@@ -10,6 +10,8 @@ Al navegar se muestra **Cargando…** y el cursor de espera mientras se prepara 
 
 En **Evaluación de proveedores**, **Comparar** muestra barras de puntaje y margen bruto, con indicadores de stock, compras pendientes, ventas y reposición. Una barra permite elegir proveedor; **Listado completo** muestra todas las ofertas, incluidas las excluidas. Los gráficos sintetizan las primeras ocho. **Criterios** e **Historial** se despliegan cuando se necesitan.
 
+El indicador **Ventas en 90 días** también muestra **Ref.**: el precio de venta por unidad usado para estimar margen y beneficio bruto. Es el menor entre catálogo y promedio neto vendido en los últimos 90 días; sin ventas, usa catálogo. No representa el precio de compra del proveedor.
+
 **Actualizar** recalcula una comparación todavía no confirmada y conserva su elección y fundamento en preparación. La comparación anterior permanece en el historial. Para una decisión confirmada, recarga ese registro; **Comparar** inicia otro análisis con datos actuales. Los gráficos usan el control incluido en .NET Framework y no requieren instalar otra biblioteca.
 
 Cambiar cantidad o ponderaciones conserva el fundamento en preparación y exige **Comparar** antes de confirmar. Cambiar de perfume o abrir una comparación del historial solicita confirmar el descarte de la elección sin guardar; cancelar conserva el trabajo. El resumen explica los factores que favorecen al recomendado, su costo respecto de la oferta elegible más barata y el margen bruto. Se calcula con la instantánea mostrada y distingue una elección manual diferente de la recomendación original.
