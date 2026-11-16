@@ -4,7 +4,9 @@ Aplicación de escritorio C# (.NET Framework 4.7.2) con SQL Server **16.x (SQL S
 
 ## Uso de Compras y evaluación
 
-Compras abre la grilla de órdenes. **Nuevo borrador** despliega sus campos; las altas de proveedores y perfumes están en **Catálogos → Nuevo proveedor / Nuevo perfume**, en ventanas separadas. Al guardar, las listas se recargan. **Actualizar** y el cambio de pestaña consultan catálogos, órdenes, pendientes y recepción; la selección se conserva si todavía existe y se informa la hora de carga.
+Compras abre la grilla de órdenes. **Nuevo borrador** despliega sus campos; las altas de proveedores y perfumes están en **Catálogos → Nuevo proveedor / Nuevo perfume**, en ventanas separadas. Al guardar, las listas se recargan. **Actualizar** recarga los datos; cambiar de pestaña consulta los datos de esa página, conservando la selección si todavía existe e informando la hora de carga.
+
+Al navegar se muestra **Cargando…** y el cursor de espera mientras se prepara la vista. El panel compone el pintado de sus controles para reducir el armado visible; pulsar el acceso ya seleccionado conserva la pantalla actual. Si falla una nueva vista, se conserva la anterior y se informa el error.
 
 En **Evaluación de proveedores**, **Comparar** muestra barras de puntaje y margen bruto, con indicadores de stock, compras pendientes, ventas y reposición. Una barra permite elegir proveedor; **Listado completo** muestra todas las ofertas, incluidas las excluidas. Los gráficos sintetizan las primeras ocho. **Criterios** e **Historial** se despliegan cuando se necesitan.
 

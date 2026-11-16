@@ -106,7 +106,7 @@ namespace UI.UserControls
             ConfigurarAcceso();
             RecargarTodo();
             if (tabs.TabPages.Contains(tabOrdenes)) tabs.SelectedTab = tabOrdenes;
-            tabs.SelectedIndexChanged += delegate { RecargarTodo(); };
+            tabs.SelectedIndexChanged += delegate { RecargarPagina(); };
         }
 
         private static ComboBox Combo(string nombre)
@@ -372,12 +372,32 @@ namespace UI.UserControls
                 recargando = true;
                 try
                 {
-                    CargarCatalogos(); CargarOrdenes(); CargarPendientes(); CargarOrdenesRecepcion();
-                    if (TienePermiso(TipoPermiso.Inventario_Recepcionar)) CargarInventario();
-                    if (evaluacion != null) evaluacion.ActualizarCatalogos();
-                    estadoCarga.Text = "Datos actualizados a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                    CargaVisual.Ejecutar(this, delegate {
+                        CargarCatalogos(); CargarOrdenes(); CargarPendientes(); CargarOrdenesRecepcion();
+                        if (TienePermiso(TipoPermiso.Inventario_Recepcionar)) CargarInventario();
+                        if (evaluacion != null) evaluacion.ActualizarCatalogos();
+                        estadoCarga.Text = "Datos actualizados a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                    }, "Actualizando datos…");
                 }
                 finally { recargando = false; }
+            }, null);
+        }
+
+        private void RecargarPagina()
+        {
+            if (recargando) return;
+            Ejecutar(delegate {
+                recargando = true;
+                try {
+                    CargaVisual.Ejecutar(this, delegate {
+                        if (tabs.SelectedTab == tabCatalogos) CargarCatalogos();
+                        else if (tabs.SelectedTab == tabOrdenes) { CargarCatalogos(); CargarOrdenes(); }
+                        else if (tabs.SelectedTab == tabContabilidad) CargarPendientes();
+                        else if (tabs.SelectedTab == tabRecepcion) { CargarCatalogos(); CargarOrdenesRecepcion(); CargarInventario(); }
+                        else if (evaluacion != null) evaluacion.ActualizarCatalogos();
+                        estadoCarga.Text = "Datos actualizados a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                    }, "Cargando " + tabs.SelectedTab.Text + "…");
+                } finally { recargando = false; }
             }, null);
         }
 
