@@ -17,6 +17,7 @@ namespace UI
         private readonly IdiomaBLL idiomaBLL;
         private readonly TraduccionBLL traduccionBLL;
         private Button accesoActivo;
+        private bool navegando;
         private readonly Label sesionActiva = new Label { Name = "lblSesionActiva", AutoEllipsis = true,
             TextAlign = System.Drawing.ContentAlignment.MiddleLeft, Padding = new Padding(10, 0, 10, 0),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
@@ -62,12 +63,30 @@ namespace UI
 
         private void MostrarVista(Func<UserControl> crearVista, Button acceso)
         {
+            if (navegando || (acceso == accesoActivo && panel1.Controls.OfType<UserControl>().Any())) return;
             if (!PuedeAbandonarVista()) return;
-            var vista = crearVista();
-            foreach (Control anterior in new List<Control>(ObtenerVistas())) anterior.Dispose();
-            vista.Dock = DockStyle.Fill; panel1.Controls.Add(vista); vista.Show();
-            if (accesoActivo != null) TemaAplicacion.AplicarNavegacion(accesoActivo, false);
-            accesoActivo = acceso; TemaAplicacion.AplicarNavegacion(accesoActivo, true);
+            var anteriores = new List<Control>(ObtenerVistas());
+            navegando = true;
+            try {
+                CargaVisual.Ejecutar(panel1, delegate {
+                    UserControl vista = null;
+                    try {
+                        vista = crearVista(); vista.Dock = DockStyle.Fill;
+                        panel1.SuspendLayout();
+                        try { panel1.Controls.Add(vista); vista.Show(); }
+                        finally { panel1.ResumeLayout(true); }
+                        foreach (Control anterior in anteriores) anterior.Dispose();
+                        if (accesoActivo != null) TemaAplicacion.AplicarNavegacion(accesoActivo, false);
+                        accesoActivo = acceso; TemaAplicacion.AplicarNavegacion(accesoActivo, true);
+                    } catch { if (vista != null) vista.Dispose(); throw; }
+                }, "Cargando " + acceso.Text + "…");
+            } catch (Exception error) { MostrarErrorNavegacion(error.Message); }
+            finally { navegando = false; }
+        }
+
+        protected virtual void MostrarErrorNavegacion(string mensaje)
+        {
+            MessageBox.Show(this, "No se pudo abrir la vista. " + mensaje, "Navegación", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         private bool PuedeAbandonarVista()

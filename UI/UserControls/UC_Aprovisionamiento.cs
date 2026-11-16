@@ -106,7 +106,7 @@ namespace UI.UserControls
             ConfigurarAcceso();
             RecargarTodo();
             if (tabs.TabPages.Contains(tabOrdenes)) tabs.SelectedTab = tabOrdenes;
-            tabs.SelectedIndexChanged += delegate { RecargarTodo(); };
+            tabs.SelectedIndexChanged += delegate { RecargarPagina(); };
         }
 
         private static ComboBox Combo(string nombre)
@@ -345,6 +345,15 @@ namespace UI.UserControls
             consulta.Controls.Add(Boton("Consultar", "btnConsultarInventario", ConsultarInventario));
             consulta.Controls.Add(lblStock);
             layout.Controls.Add(consulta, 0, 4);
+            dgvTrazabilidad.AutoGenerateColumns = false;
+            string[] columnas = { "IdLote", "Producto", "Proveedor", "IdOrdenCompra", "CodigoLote", "Origen", "FechaVencimiento", "FechaRecepcion", "CantidadIngresada", "CantidadDisponible" };
+            string[] titulos = { "# Lote", "Producto", "Proveedor", "# Orden", "Código de lote", "Origen", "Vencimiento", "Recepción", "Ingresada", "Disponible" };
+            for (int i = 0; i < columnas.Length; i++)
+                dgvTrazabilidad.Columns.Add(new DataGridViewTextBoxColumn {
+                    Name = columnas[i], DataPropertyName = columnas[i], HeaderText = titulos[i], MinimumWidth = i == 1 || i == 2 ? 140 : 80
+                });
+            dgvTrazabilidad.Columns["FechaVencimiento"].DefaultCellStyle.Format = "dd/MM/yyyy";
+            dgvTrazabilidad.Columns["FechaRecepcion"].DefaultCellStyle.Format = "dd/MM/yyyy";
             layout.Controls.Add(dgvTrazabilidad, 0, 5);
             tabRecepcion.Controls.Add(layout);
         }
@@ -372,12 +381,32 @@ namespace UI.UserControls
                 recargando = true;
                 try
                 {
-                    CargarCatalogos(); CargarOrdenes(); CargarPendientes(); CargarOrdenesRecepcion();
-                    if (TienePermiso(TipoPermiso.Inventario_Recepcionar)) CargarInventario();
-                    if (evaluacion != null) evaluacion.ActualizarCatalogos();
-                    estadoCarga.Text = "Datos actualizados a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                    CargaVisual.Ejecutar(this, delegate {
+                        CargarCatalogos(); CargarOrdenes(); CargarPendientes(); CargarOrdenesRecepcion();
+                        if (TienePermiso(TipoPermiso.Inventario_Recepcionar)) CargarInventario();
+                        if (evaluacion != null) evaluacion.ActualizarCatalogos();
+                        estadoCarga.Text = "Datos actualizados a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                    }, "Actualizando datos…");
                 }
                 finally { recargando = false; }
+            }, null);
+        }
+
+        private void RecargarPagina()
+        {
+            if (recargando) return;
+            Ejecutar(delegate {
+                recargando = true;
+                try {
+                    CargaVisual.Ejecutar(this, delegate {
+                        if (tabs.SelectedTab == tabCatalogos) CargarCatalogos();
+                        else if (tabs.SelectedTab == tabOrdenes) { CargarCatalogos(); CargarOrdenes(); }
+                        else if (tabs.SelectedTab == tabContabilidad) CargarPendientes();
+                        else if (tabs.SelectedTab == tabRecepcion) { CargarCatalogos(); CargarOrdenesRecepcion(); CargarInventario(); }
+                        else if (evaluacion != null) evaluacion.ActualizarCatalogos();
+                        estadoCarga.Text = "Datos actualizados a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                    }, "Cargando " + tabs.SelectedTab.Text + "…");
+                } finally { recargando = false; }
             }, null);
         }
 
@@ -884,12 +913,17 @@ namespace UI.UserControls
 
         private void CargarInventario()
         {
-                if (cmbInventarioProducto.SelectedValue == null) { lblStock.Text = "Stock disponible: -"; dgvTrazabilidad.DataSource = null; return; }
-                int idProducto = ValorSeleccionado(cmbInventarioProducto);
-                lblStock.Text = "Stock disponible: " + inventarioBLL.VerificarStock(idProducto);
-                dgvTrazabilidad.DataSource = inventarioBLL.ObtenerTrazabilidad(idProducto);
-                if (dgvTrazabilidad.Columns.Contains("CertificadoOrigen"))
-                    dgvTrazabilidad.Columns["CertificadoOrigen"].Visible = false;
+            var producto = cmbInventarioProducto.SelectedItem as Producto;
+            if (producto == null) { lblStock.Text = "Stock disponible: -"; dgvTrazabilidad.DataSource = null; return; }
+            // Include inactive suppliers: their names remain relevant to historical lots.
+            var proveedores = proveedorBLL.Listar(false).ToDictionary(p => p.IdProveedor, p => p.RazonSocial);
+            lblStock.Text = "Stock disponible: " + inventarioBLL.VerificarStock(producto.IdProducto);
+            dgvTrazabilidad.DataSource = inventarioBLL.ObtenerTrazabilidad(producto.IdProducto).Select(l => new {
+                l.IdLote, Producto = producto.Nombre,
+                Proveedor = proveedores.ContainsKey(l.IdProveedor) ? proveedores[l.IdProveedor] : "Proveedor no disponible",
+                l.IdOrdenCompra, l.CodigoLote, l.Origen, l.FechaVencimiento, l.FechaRecepcion,
+                l.CantidadIngresada, l.CantidadDisponible
+            }).ToList();
         }
 
         private static int ValorSeleccionado(ComboBox combo)

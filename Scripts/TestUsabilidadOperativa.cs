@@ -44,9 +44,47 @@ internal static class TestUsabilidadOperativa
         return admin;
     }
     private sealed class MenuPrueba : FormPrincipal {
-        public bool Descartar; public int Consultas;
+        public bool Descartar; public int Consultas; public string ErrorNavegacion;
         public MenuPrueba(Usuario actor) : base(actor) { }
         protected override bool ConfirmarDescartePendiente() { Consultas++; return Descartar; }
+        protected override void MostrarErrorNavegacion(string mensaje) { ErrorNavegacion=mensaje; }
+    }
+    private static void ComprobarCargaNavegacion(Usuario owner)
+    {
+        using(var menu=new MenuPrueba(owner)) {
+            menu.Show();Application.DoEvents();
+            var panel=Find<Panel>(menu,"panel1");var anterior=panel.Controls.OfType<UserControl>().Single();
+            var parametros=(CreateParams)typeof(Control).GetProperty("CreateParams",BindingFlags.Instance|BindingFlags.NonPublic).GetValue(panel,null);
+            Assert((parametros.ExStyle & 0x02000000)!=0,"El panel de navegacion compone el pintado de sus controles hijos");
+            int pinturas=0,creaciones=0,reentradas=0;bool cargaCubierta=false;
+            panel.ControlAdded+=delegate(object s,ControlEventArgs e){if(e.Control.Name=="panelCargaNavegacion")e.Control.Paint+=delegate{pinturas++;};};
+            var nueva=new UserControl {Name="vistaNavegacionPrueba"};
+            var mostrar=typeof(FormPrincipal).GetMethod("MostrarVista",BindingFlags.NonPublic|BindingFlags.Instance);
+            var acceso=Find<Button>(menu,"btnVentas");
+            nueva.Load+=delegate {cargaCubierta=panel.Controls.Find("panelCargaNavegacion",false).Single().Visible && !anterior.IsDisposed;};
+            Func<UserControl> fabrica=delegate {
+                creaciones++;
+                Assert(panel.Controls.Find("lblCargaNavegacion",true).Single().Text.Contains("Cargando") && pinturas>0,
+                    "El aviso se pinta antes de iniciar la construccion de la vista");
+                Assert(panel.UseWaitCursor,"El cursor indica espera durante la carga");
+                mostrar.Invoke(menu,new object[]{(Func<UserControl>)delegate{reentradas++;return new UserControl();},acceso});
+                return nueva;
+            };
+            mostrar.Invoke(menu,new object[]{fabrica,acceso});
+            Assert(cargaCubierta && anterior.IsDisposed && panel.Controls.OfType<UserControl>().Single()==nueva,
+                "La vista anterior se conserva hasta terminar Load y despues se reemplaza");
+            Assert(reentradas==0 && !panel.UseWaitCursor && panel.Controls.Find("panelCargaNavegacion",false).Length==0,
+                "La carga impide navegacion reentrante y retira aviso y cursor al terminar");
+            mostrar.Invoke(menu,new object[]{fabrica,acceso});
+            Assert(creaciones==1 && panel.Controls.OfType<UserControl>().Single()==nueva,
+                "Pulsar el acceso activo conserva la vista y evita reconstruirla");
+            mostrar.Invoke(menu,new object[]{(Func<UserControl>)delegate{throw new InvalidOperationException("Fallo de carga de prueba");},Find<Button>(menu,"btnAprovisionamiento")});
+            Assert(menu.ErrorNavegacion=="Fallo de carga de prueba" && !nueva.IsDisposed && panel.Controls.OfType<UserControl>().Single()==nueva,
+                "Un error al construir conserva la vista anterior y comunica el problema");
+            Assert(!panel.UseWaitCursor && panel.Controls.Find("panelCargaNavegacion",false).Length==0,
+                "Un error no deja la pantalla cubierta ni el cursor bloqueado");
+            menu.Close();
+        }
     }
     private sealed class ComprasPrueba : UC_Aprovisionamiento {
         public bool Descartar; public int Consultas;
@@ -182,6 +220,18 @@ internal static class TestUsabilidadOperativa
         Assert(new InventarioBLL().VerificarStock(productos[0].IdProducto)==stock+1 && Find<Label>(compras,"lblStock").Text.EndsWith((stock+1).ToString()) &&
             Find<DataGridView>(compras,"dgvTrazabilidad").Rows.Count==lotes+1 && lote.Text=="" && !compras.TieneCambiosPendientes,
             "Registrar recepcion actualiza stock y trazabilidad visibles y limpia la preparacion");
+        var trazabilidad=Find<DataGridView>(compras,"dgvTrazabilidad");
+        var ingreso=trazabilidad.Rows.Cast<DataGridViewRow>().Single(r => (string)r.Cells["CodigoLote"].Value=="TEST-RECEPCION-SEGURA");
+        var proveedorIngreso=new ProveedorBLL().Listar(false).Single(p=>p.IdProveedor==orden.IdProveedor);
+        Assert((string)ingreso.Cells["Producto"].Value==productos[0].Nombre && (string)ingreso.Cells["Proveedor"].Value==proveedorIngreso.RazonSocial,
+            "La trazabilidad muestra nombres del perfume y proveedor del lote recibido");
+        Assert(!trazabilidad.Columns.Contains("IdProducto") && !trazabilidad.Columns.Contains("IdProveedor") && !trazabilidad.Columns.Contains("CertificadoOrigen") && trazabilidad.Columns["IdLote"].HeaderText=="# Lote",
+            "Inventario presenta # Lote y omite identificadores internos de producto y proveedor y certificado");
+        var productoInventario=Find<ComboBox>(compras,"cmbInventarioProducto");
+        productoInventario.SelectedValue=productos[1].IdProducto; Click(compras,"btnConsultarInventario");
+        Assert(trazabilidad.Rows.Cast<DataGridViewRow>().All(r=>(string)r.Cells["Producto"].Value==productos[1].Nombre) && trazabilidad.Columns["IdLote"].HeaderText=="# Lote",
+            "Cambiar el perfume actualiza los nombres y conserva los encabezados de inventario");
+        productoInventario.SelectedValue=productos[0].IdProducto; Click(compras,"btnConsultarInventario");
         unidades.Value=3; lote.Text="TEST-PREPARADO"; origen.Text="Argentina";
         bll.RecepcionarMercaderia(orden.IdOrdenCompra,new System.Collections.Generic.List<Lote> {
             new Lote { IdProducto=productos[0].IdProducto, CodigoLote="TEST-EXTERNO", Origen="Argentina", CantidadIngresada=2, FechaVencimiento=DateTime.Today.AddYears(1) }
@@ -317,7 +367,7 @@ internal static class TestUsabilidadOperativa
             if (owner == null) throw new Exception("No se pudo iniciar sesión demo.");
             if (args.Length == 0) { Session.Instance.Login(Admin(owner)); Application.Run(new FormPrincipal(Session.Instance.Usuario)); return 0; }
             using (cn = new SqlConnection(cs.ConnectionString)) using (var host = new Form { ClientSize = new Size(1080, 680) }) {
-                cn.Open(); ComprobarMigracion(); ComprobarAcceso(); ComprobarSoporte(owner); ComprobarFormatoNumerico(); Session.Instance.Login(owner); int clients = Count("Cliente");
+                cn.Open(); ComprobarMigracion(); ComprobarAcceso(); ComprobarSoporte(owner); ComprobarFormatoNumerico(); Session.Instance.Login(owner); ComprobarCargaNavegacion(owner); int clients = Count("Cliente");
                 Assert(FormatoPresentacion.Moneda(60000m).Contains("60.000,00"), "Importes mostrados usan el criterio argentino sin cambiar la cultura del hilo");
                 using (var alta = new FormAltaCliente("test.venta@example.com")) {
                     Click(alta, "btnRegistrarCliente");
@@ -410,6 +460,13 @@ internal static class TestUsabilidadOperativa
                 }
                 var rootTabs = compras.Controls.OfType<TabControl>().Single(); rootTabs.SelectedTab = rootTabs.TabPages.Cast<TabPage>().Single(t => t.Text == "Evaluación de proveedores");
                 var evaluation = (UC_EvaluacionProveedores)Field(compras, "evaluacion"); evaluation.ModoPrueba = true;
+                int recargasOrdenes=0,recargasRecepcion=0;
+                orders.DataSourceChanged+=delegate{recargasOrdenes++;};
+                Find<ComboBox>(compras,"cmbOrdenRecepcion").DataSourceChanged+=delegate{recargasRecepcion++;};
+                rootTabs.SelectedTab=rootTabs.TabPages.Cast<TabPage>().Single(t=>t.Text=="Órdenes de compra");
+                recargasOrdenes=recargasRecepcion=0;
+                rootTabs.SelectedTab=rootTabs.TabPages.Cast<TabPage>().Single(t=>t.Text=="Evaluación de proveedores");
+                Assert(recargasOrdenes==0 && recargasRecepcion==0,"Cambiar a N03 actualiza su pagina sin volver a enlazar ordenes ni recepciones ocultas");
                 Find<ComboBox>(evaluation, "cmbEvaluacionProducto").SelectedValue = suggestedId; Click(evaluation, "btnCompararProveedores"); Click(evaluation, "btnUsarCantidadSugerida");
                 Assert(Find<NumericUpDown>(evaluation, "nudEvaluacionCantidad").Value == 7 && !evaluation.TieneCambiosPendientes, "Usar cantidad sugerida vuelve a comparar sin confirmar ni crear compras");
                 string fundamento = "Compra de reposicion fundamentada en stock." + Environment.NewLine + "Se elige por conveniencia y plazo.";

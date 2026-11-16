@@ -60,6 +60,7 @@
     <Compile Include="FormDetalleOrdenCompra.cs" />
     <Compile Include="IVistaConCambiosPendientes.cs" />
     <Compile Include="TemaAplicacion.cs" />
+    <Compile Include="CargaVisual.cs" />
     <Compile Include="PestanasTematicas.cs" />
     <Compile Include="FormatoPresentacion.cs" />
     <Compile Include="NumeroRegional.cs" />

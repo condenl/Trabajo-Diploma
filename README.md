@@ -4,7 +4,9 @@ Aplicación de escritorio C# (.NET Framework 4.7.2) con SQL Server **16.x (SQL S
 
 ## Uso de Compras y evaluación
 
-Compras abre la grilla de órdenes. **Nuevo borrador** despliega sus campos; las altas de proveedores y perfumes están en **Catálogos → Nuevo proveedor / Nuevo perfume**, en ventanas separadas. Al guardar, las listas se recargan. **Actualizar** y el cambio de pestaña consultan catálogos, órdenes, pendientes y recepción; la selección se conserva si todavía existe y se informa la hora de carga.
+Compras abre la grilla de órdenes. **Nuevo borrador** despliega sus campos; las altas de proveedores y perfumes están en **Catálogos → Nuevo proveedor / Nuevo perfume**, en ventanas separadas. Al guardar, las listas se recargan. **Actualizar** recarga los datos; cambiar de pestaña consulta los datos de esa página, conservando la selección si todavía existe e informando la hora de carga.
+
+Al navegar se muestra **Cargando…** y el cursor de espera mientras se prepara la vista. El panel compone el pintado de sus controles para reducir el armado visible; pulsar el acceso ya seleccionado conserva la pantalla actual. Si falla una nueva vista, se conserva la anterior y se informa el error.
 
 En **Evaluación de proveedores**, **Comparar** muestra barras de puntaje y margen bruto, con indicadores de stock, compras pendientes, ventas y reposición. Una barra permite elegir proveedor; **Listado completo** muestra todas las ofertas, incluidas las excluidas. Los gráficos sintetizan las primeras ocho. **Criterios** e **Historial** se despliegan cuando se necesitan.
 
@@ -150,7 +152,7 @@ En **Órdenes de compra → Nuevo borrador**, elegir proveedor y agregar los per
 
 Los importes usan coma decimal: `12.000,50` o `12000,50`. El editor conserva y señala entradas inválidas, fuera de rango o con demasiados decimales; una entrada como `12000.50` se rechaza. No se reemplaza silenciosamente por otro importe ni se permite guardar hasta corregirla.
 
-En **Recepción e inventario**, cambiar de orden o perfume con datos preparados requiere confirmar su descarte. **Actualizar** conserva el contexto de la entrega y señala si una recepción de otro operador redujo su saldo. Al registrar el ingreso se muestran inmediatamente las existencias y la trazabilidad del perfume recibido. Las escrituras de Compras, Depósito y Ventas requieren una sesión activa y el permiso del actor.
+En **Recepción e inventario**, cambiar de orden o perfume con datos preparados requiere confirmar su descarte. **Actualizar** conserva el contexto de la entrega y señala si una recepción de otro operador redujo su saldo. Al registrar el ingreso se muestran inmediatamente las existencias y la trazabilidad del perfume recibido. La tabla identifica los lotes con **# Lote**, muestra los nombres del producto y proveedor (incluidos proveedores inactivos con ingresos históricos) y conserva las cantidades y referencias de orden. Las escrituras de Compras, Depósito y Ventas requieren una sesión activa y el permiso del actor.
 
 Validación reproducible: `powershell -NoProfile -File Scripts/test-usabilidad-operativa.ps1 -ServerInstance "DESKTOP-TFHVP49"` (o `"(localdb)\MSSQLLocalDB"`). Crea una base aislada; no modifica la configuración de desarrollo. Evidencia: [Verificacion_Demo_Compras.md](Documentacion/Verificacion_Demo_Compras.md).
 
