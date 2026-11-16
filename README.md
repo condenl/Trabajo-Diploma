@@ -10,6 +10,8 @@ Al navegar se muestra **Cargando…** y el cursor de espera mientras se prepara 
 
 En **Evaluación de proveedores**, **Comparar** muestra barras de puntaje y margen bruto, con indicadores de stock, compras pendientes, ventas y reposición. Una barra permite elegir proveedor; **Listado completo** muestra todas las ofertas, incluidas las excluidas. Los gráficos sintetizan las primeras ocho. **Criterios** e **Historial** se despliegan cuando se necesitan.
 
+El indicador **Ventas en 90 días** también muestra **Ref.**: el precio de venta por unidad usado para estimar margen y beneficio bruto. Es el menor entre catálogo y promedio neto vendido en los últimos 90 días; sin ventas, usa catálogo. No representa el precio de compra del proveedor.
+
 **Actualizar** recalcula una comparación todavía no confirmada y conserva su elección y fundamento en preparación. La comparación anterior permanece en el historial. Para una decisión confirmada, recarga ese registro; **Comparar** inicia otro análisis con datos actuales. Los gráficos usan el control incluido en .NET Framework y no requieren instalar otra biblioteca.
 
 Cambiar cantidad o ponderaciones conserva el fundamento en preparación y exige **Comparar** antes de confirmar. Cambiar de perfume o abrir una comparación del historial solicita confirmar el descarte de la elección sin guardar; cancelar conserva el trabajo. El resumen explica los factores que favorecen al recomendado, su costo respecto de la oferta elegible más barata y el margen bruto. Se calcula con la instantánea mostrada y distingue una elección manual diferente de la recomendación original.
@@ -157,6 +159,8 @@ En **Recepción e inventario**, cambiar de orden o perfume con datos preparados 
 Validación reproducible: `powershell -NoProfile -File Scripts/test-usabilidad-operativa.ps1 -ServerInstance "DESKTOP-TFHVP49"` (o `"(localdb)\MSSQLLocalDB"`). Crea una base aislada; no modifica la configuración de desarrollo. Evidencia: [Verificacion_Demo_Compras.md](Documentacion/Verificacion_Demo_Compras.md).
 
 En **Ventas**, cambiar de perfume y finalizar una venta restablecen la cantidad a 1. **Actualizar** conserva la cantidad si sigue seleccionado el mismo perfume. **Nueva venta** permite descartar una preparación con confirmación; conserva todos los datos si se cancela el descarte. Las pantallas de Compras y N03 permiten desplazamiento vertical para mantener utilizables las tablas, gráficos y acciones en ventanas pequeñas.
+
+Las opciones **Venta ocasional** y **Con cliente** indican la modalidad. La primera es la inicial; la segunda habilita buscar o registrar el cliente y requiere identificarlo antes de confirmar. Volver a ocasional conserva los productos, quita el cliente y recalcula sin descuento de membresía. Una venta terminada vuelve a ocasional. El precio unitario proviene del catálogo; la membresía puede reducir el importe neto.
 
 ### Copia independiente para ensayar
 

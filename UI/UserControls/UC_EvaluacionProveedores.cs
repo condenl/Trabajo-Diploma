@@ -67,6 +67,7 @@ namespace UI.UserControls
             filtros.Controls.Add(Boton("Criterios", "btnCriteriosEvaluacion", delegate { criterios.Visible = !criterios.Visible; }));
             filtros.Controls.Add(Boton("Historial", "btnHistorialEvaluacion", delegate { pie.Visible = !pie.Visible; }));
             layout.Controls.Add(filtros, 0, 0); layout.Controls.Add(criterios, 0, 1); layout.Controls.Add(contexto, 0, 2);
+            ventas.Width = 310;
             var tarjetas = Flujo(); foreach (var tarjeta in new[] { stock, pendientes, ventas, reposicion }) tarjetas.Controls.Add(tarjeta);
             layout.Controls.Add(tarjetas, 0, 3);
             var resultados = new PestanasTematicas { Name = "tabsResultadosEvaluacion", Dock = DockStyle.Fill, MinimumSize = new Size(0, 250) };
@@ -227,7 +228,8 @@ namespace UI.UserControls
             finally { cargando = false; }
             actual = e; proveedorSeleccionado = proveedorBorrador = null; grilla.BindingContext = BindingContext; grilla.DataSource = e.Resultados; motivo.Text = e.MotivoSeleccion ?? "";
             stock.Text = "Stock utilizable\n" + e.Datos.StockDisponible + " u."; pendientes.Text = "Por recibir\n" + e.Datos.ComprasPendientes + " u.";
-            ventas.Text = "Ventas en 90 días\n" + e.Datos.UnidadesVendidas90Dias + " u."; reposicion.Text = "Reponer (30 días)\n" + e.CantidadSugerida + " u.";
+            ventas.Text = "Ventas en 90 días\n" + e.Datos.UnidadesVendidas90Dias + " u. | Ref.: " + FormatoPresentacion.Moneda(e.PrecioVentaReferencia) + "/u.";
+            reposicion.Text = "Reponer (30 días)\n" + e.CantidadSugerida + " u.";
             contexto.Text = e.IdProveedorSeleccionado.HasValue ? "Proveedor confirmado: " + e.Resultados.First(r => r.IdProveedor == e.IdProveedorSeleccionado).Proveedor :
                 e.IdProveedorRecomendado.HasValue ? "Recomendado: " + e.Resultados.First(r => r.IdProveedor == e.IdProveedorRecomendado).Proveedor : "Sin recomendación. Consulte las ofertas excluidas en el listado.";
             contexto.Text += " · #" + e.IdEvaluacion + " del " + e.FechaEvaluacion.ToString("dd/MM/yyyy HH:mm");

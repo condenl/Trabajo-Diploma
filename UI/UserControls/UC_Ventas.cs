@@ -30,6 +30,8 @@ namespace UI.UserControls
         private readonly Label resumen = Etiqueta("lblTotalesVenta", "");
         private readonly Label estado = Etiqueta("lblEstadoVenta", "");
         private Button confirmar;
+        private readonly RadioButton ventaOcasional = new RadioButton { Name = "rbVentaOcasional", Text = "Venta ocasional", Checked = true, AutoSize = true, Margin = new Padding(3, 10, 12, 3) };
+        private readonly RadioButton conCliente = new RadioButton { Name = "rbVentaConCliente", Text = "Con cliente", AutoSize = true, Margin = new Padding(3, 10, 12, 3) };
         private bool cargandoProductos;
 
         public UC_Ventas()
@@ -40,10 +42,11 @@ namespace UI.UserControls
             for (int i = 0; i < 7; i++) layout.RowStyles.Add(new RowStyle(i == 4 ? SizeType.Percent : SizeType.AutoSize, i == 4 ? 100 : 0));
             layout.Controls.Add(new Label { Text = "Venta", AutoSize = true, Font = new Font(Font.FontFamily, 16, FontStyle.Bold), Margin = new Padding(3, 3, 3, 12) }, 0, 0);
             var clientes = Barra();
+            clientes.Controls.Add(ventaOcasional); clientes.Controls.Add(conCliente);
             clientes.Controls.Add(Etiqueta("", "Correo del cliente")); clientes.Controls.Add(txtEmail);
-            clientes.Controls.Add(Boton("Buscar cliente", "btnBuscarCliente", BuscarCliente));
-            clientes.Controls.Add(Boton("Nuevo cliente...", "btnNuevoCliente", NuevoCliente));
-            clientes.Controls.Add(Boton("Venta ocasional", "btnQuitarCliente", delegate { QuitarCliente(); }));
+            var buscar = Boton("Buscar cliente", "btnBuscarCliente", BuscarCliente);
+            var nuevo = Boton("Nuevo cliente...", "btnNuevoCliente", NuevoCliente);
+            clientes.Controls.Add(buscar); clientes.Controls.Add(nuevo);
             layout.Controls.Add(clientes, 0, 1); layout.Controls.Add(lblCliente, 0, 2);
             var productos = Barra();
             productos.Controls.Add(Etiqueta("", "Perfume")); productos.Controls.Add(cmbProducto);
@@ -69,6 +72,12 @@ namespace UI.UserControls
                 { clienteActual = null; MostrarCliente(); ActualizarTotales(); }
             };
             txtEmail.KeyDown += delegate(object s, KeyEventArgs e) { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; BuscarCliente(s, EventArgs.Empty); } };
+            ventaOcasional.CheckedChanged += delegate {
+                txtEmail.Enabled = buscar.Enabled = nuevo.Enabled = !ventaOcasional.Checked;
+                if (ventaOcasional.Checked) QuitarCliente();
+                else { MostrarCliente(); ActualizarTotales(); txtEmail.Focus(); }
+            };
+            txtEmail.Enabled = buscar.Enabled = nuevo.Enabled = false;
             cmbProducto.SelectedIndexChanged += delegate {
                 if (!cargandoProductos) NumeroRegional.Restablecer(nudCantidad, 1);
                 Ejecutar(ActualizarStock);
@@ -115,7 +124,8 @@ namespace UI.UserControls
                     }
             });
         }
-        private void MostrarCliente() { lblCliente.Text = clienteActual == null ? "Venta ocasional · sin cliente seleccionado" : "Cliente: " + clienteActual.NombreCompleto + " · " + clienteActual.Email; }
+        private void MostrarCliente() { lblCliente.Text = clienteActual != null ? "Cliente: " + clienteActual.NombreCompleto + " · " + clienteActual.Email :
+            ventaOcasional.Checked ? "Venta ocasional · sin cliente seleccionado" : "Busque o registre el cliente de esta venta."; }
         private void QuitarCliente() { clienteActual = null; txtEmail.Clear(); MostrarCliente(); ActualizarTotales(); }
         protected virtual bool ConfirmarDescarteVenta()
         {
@@ -129,7 +139,8 @@ namespace UI.UserControls
         }
         private void LimpiarVenta()
         {
-            grilla.Rows.Clear(); NumeroRegional.Restablecer(nudCantidad, 1); QuitarCliente();
+            grilla.Rows.Clear(); NumeroRegional.Restablecer(nudCantidad, 1);
+            if (ventaOcasional.Checked) QuitarCliente(); else ventaOcasional.Checked = true;
         }
         private void AgregarProducto(object sender, EventArgs e)
         {
@@ -164,15 +175,16 @@ namespace UI.UserControls
                     decimal precio = venta.Detalles.First(d => d.IdProducto == (int)fila.Cells["IdProducto"].Value).PrecioUnitario;
                     fila.Cells["Precio"].Value = precio; fila.Cells["Importe"].Value = precio * (int)fila.Cells["Cantidad"].Value;
                 }
-                cotizacion = venta; confirmar.Enabled = true;
+                cotizacion = venta; confirmar.Enabled = ventaOcasional.Checked || clienteActual != null;
                 resumen.Text = "Subtotal: " + venta.Subtotal.ToString("C2", FormatoPresentacion.Cultura) + " · Descuento: " + venta.Descuento.ToString("C2", FormatoPresentacion.Cultura) + " · Total: " + venta.Total.ToString("C2", FormatoPresentacion.Cultura);
-                estado.Text = "Importes calculados con precios actuales y membresía activa, si corresponde."; estado.ForeColor = TemaAplicacion.Texto;
+                estado.Text = confirmar.Enabled ? "Importes calculados con precios actuales y membresía activa, si corresponde." : "Busque o registre un cliente, o elija Venta ocasional para continuar."; estado.ForeColor = TemaAplicacion.Texto;
                 UltimoError = null;
             } catch (Exception ex) { resumen.Text = "Total pendiente de revisión"; Notificar(ex.Message, true); }
         }
         private void ConfirmarVenta(object sender, EventArgs e)
         {
             Ejecutar(delegate {
+                if (!ventaOcasional.Checked && clienteActual == null) throw new InvalidOperationException("Busque o registre un cliente, o elija Venta ocasional para continuar.");
                 var anterior = cotizacion; ActualizarTotales(); if (cotizacion == null) return;
                 if (anterior == null || anterior.Total != cotizacion.Total || anterior.Subtotal != cotizacion.Subtotal || anterior.Descuento != cotizacion.Descuento) {
                     Notificar("Los importes cambiaron. Revise el total actualizado y vuelva a confirmar.", false); return;
