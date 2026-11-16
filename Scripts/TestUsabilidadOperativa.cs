@@ -104,6 +104,7 @@ internal static class TestUsabilidadOperativa
         cantidad.Value=3; Click(vista,"btnActualizarVenta"); Assert(cantidad.Value==3,"Actualizar conserva la cantidad si conserva el perfume");
         producto.SelectedValue=producto.Items.Cast<Producto>().Single(p=>p.Codigo=="DEMO-FLORAL").IdProducto;
         Click(vista,"btnAgregarProducto"); var carrito=Find<DataGridView>(vista,"dgvVenta");
+        Find<RadioButton>(vista,"rbVentaConCliente").Checked=true;
         var correo=Find<TextBox>(vista,"txtEmail"); correo.Text="test.venta@example.com"; Click(vista,"btnBuscarCliente");
         cantidad.Text="invalida"; int ventas=Count("Venta"), movimientos=Count("MovimientoStock");
         Click(vista,"btnNuevaVenta");
@@ -113,6 +114,7 @@ internal static class TestUsabilidadOperativa
             "Nueva venta confirmada limpia carrito, identidad, cantidad, errores e importes");
         Assert(Count("Venta")==ventas && Count("MovimientoStock")==movimientos,"Descartar una venta no escribe ventas ni movimientos");
         int preguntas=vista.Consultas; Click(vista,"btnNuevaVenta"); Assert(vista.Consultas==preguntas,"Una venta vacia no pide confirmar el descarte");
+        Find<RadioButton>(vista,"rbVentaConCliente").Checked=true;
         correo.Text="correo.sin.buscar@example.com"; vista.Descartar=false; Click(vista,"btnNuevaVenta");
         Assert(vista.Consultas==preguntas+1 && correo.Text!="", "El correo preparado sin carrito tambien se protege al iniciar una venta");
         vista.Descartar=true; Click(vista,"btnNuevaVenta");
@@ -382,6 +384,8 @@ internal static class TestUsabilidadOperativa
                 using (var alta = new FormAltaCliente()) { Click(alta, "btnCancelarCliente"); Assert(Count("Cliente") == clients + 1, "Cancelar alta de cliente no guarda"); }
                 ComprobarNuevaVenta(host); ComprobarEspacioOperativo(host,owner);
                 var ventas = new UC_Ventas { ModoPrueba = true }; Host(host, ventas);
+                Assert(Find<RadioButton>(ventas,"rbVentaOcasional").Checked && !Find<RadioButton>(ventas,"rbVentaConCliente").Checked && !Find<TextBox>(ventas,"txtEmail").Enabled && !Find<Button>(ventas,"btnBuscarCliente").Enabled,
+                    "Venta ocasional es la modalidad inicial y no habilita busqueda de cliente");
                 Assert(!ventas.Controls.Find("txtNombre", true).Any() && !ventas.Controls.Find("chkMarketing", true).Any(), "Venta mantiene el alta de clientes fuera de la pantalla operativa");
                 var productos = Find<ComboBox>(ventas, "cmbProducto"); var floral = productos.Items.Cast<Producto>().Single(p => p.Codigo == "DEMO-FLORAL"); productos.SelectedValue = floral.IdProducto;
                 int sales = Count("Venta"), moves = Count("MovimientoStock");
@@ -389,6 +393,9 @@ internal static class TestUsabilidadOperativa
                 var grid = Find<DataGridView>(ventas, "dgvVenta");
                 Assert(grid.ReadOnly && !grid.AllowUserToDeleteRows && grid.Rows.Count == 1, "Carrito de solo lectura con accion explicita para quitar");
                 Assert(Count("Venta") == sales && Count("MovimientoStock") == moves, "Vista previa no registra ventas ni movimientos de stock");
+                Find<RadioButton>(ventas,"rbVentaConCliente").Checked=true;
+                Assert(!Find<RadioButton>(ventas,"rbVentaOcasional").Checked && Find<TextBox>(ventas,"txtEmail").Enabled && !Find<Button>(ventas,"btnConfirmarVenta").Enabled && grid.Rows.Count==1,
+                    "Con cliente habilita la busqueda y exige identificarlo sin perder el carrito");
                 var email = Find<TextBox>(ventas, "txtEmail"); email.Text = "test.venta@example.com"; Click(ventas, "btnBuscarCliente");
                 var cotizacion = (Venta)Field(ventas, "cotizacion");
                 Assert(cotizacion.Descuento == Math.Round(floral.PrecioVenta * .1m, 2, MidpointRounding.AwayFromZero) && cotizacion.Total == cotizacion.Subtotal - cotizacion.Descuento,
@@ -396,8 +403,11 @@ internal static class TestUsabilidadOperativa
                 Assert(Find<Label>(ventas, "lblTotalesVenta").Text.Contains(FormatoPresentacion.Moneda(cotizacion.Total)), "Total visible antes de confirmar en formato argentino");
                 email.Text = "otra.persona@example.com";
                 Assert(Field(ventas, "clienteActual") == null && ((Venta)Field(ventas, "cotizacion")).Descuento == 0, "Cambiar correo elimina cliente y descuento anteriores");
-                email.Text = "test.venta@example.com"; Click(ventas, "btnBuscarCliente"); Click(ventas, "btnQuitarCliente");
+                Assert(!Find<Button>(ventas,"btnConfirmarVenta").Enabled,"Un correo cambiado requiere volver a identificar el cliente antes de confirmar");
+                email.Text = "test.venta@example.com"; Click(ventas, "btnBuscarCliente"); Find<RadioButton>(ventas,"rbVentaOcasional").Checked=true;
                 Assert(email.Text == "" && Field(ventas, "clienteActual") == null && grid.Rows.Count == 1, "Venta ocasional conserva carrito y quita identidad del cliente");
+                Assert(!Find<RadioButton>(ventas,"rbVentaConCliente").Checked && !email.Enabled && ((Venta)Field(ventas,"cotizacion")).Descuento==0 && Find<Button>(ventas,"btnConfirmarVenta").Enabled,
+                    "Volver a ocasional quita el descuento de membresia y permite confirmar sin cliente");
                 Click(ventas, "btnQuitarProducto"); Assert(grid.Rows.Count == 0 && !Find<Button>(ventas, "btnConfirmarVenta").Enabled, "Quitar ultimo producto pone total en cero y deshabilita confirmacion");
                 Find<NumericUpDown>(ventas, "nudCantidad").Value = 999; Click(ventas, "btnAgregarProducto");
                 Assert(grid.Rows.Count == 0 && ventas.UltimoError.Contains(floral.Nombre), "Stock insuficiente se avisa con nombre de producto sin agregar una linea invalida");
@@ -405,10 +415,12 @@ internal static class TestUsabilidadOperativa
                 Query("UPDATE Producto SET PrecioVenta=PrecioVenta+123 WHERE IdProducto=" + floral.IdProducto);
                 Click(ventas, "btnConfirmarVenta");
                 Assert(Count("Venta") == sales && ventas.UltimoMensaje.Contains("importes cambiaron") && grid.Rows.Count == 1, "Cambio externo de precio requiere revisar el nuevo total antes de guardar");
+                Find<RadioButton>(ventas,"rbVentaConCliente").Checked=true;
                 email.Text = "test.venta@example.com"; Click(ventas, "btnBuscarCliente"); cotizacion = (Venta)Field(ventas, "cotizacion"); Click(ventas, "btnConfirmarVenta");
                 var persisted = Query("SELECT TOP(1) Subtotal,Descuento,Total,IdCliente FROM Venta ORDER BY IdVenta DESC").Rows[0];
                 Assert(Count("Venta") == sales + 1 && (decimal)persisted[0] == cotizacion.Subtotal && (decimal)persisted[1] == cotizacion.Descuento && (decimal)persisted[2] == cotizacion.Total, "Importes confirmados coinciden con vista previa y membresia");
                 Assert(grid.Rows.Count == 0 && email.Text == "" && Field(ventas, "clienteActual") == null && Find<NumericUpDown>(ventas,"nudCantidad").Value==1, "Venta finalizada prepara carrito, identidad y cantidad limpios");
+                Assert(Find<RadioButton>(ventas,"rbVentaOcasional").Checked && !email.Enabled,"Finalizar una venta vuelve a la modalidad ocasional");
                 ComprobarPreparacionCompras(host, owner);
                 var compras = new UC_Aprovisionamiento(owner) { ModoPrueba = true }; Host(host, compras);
                 var orders = Find<DataGridView>(compras, "dgvOrdenes");

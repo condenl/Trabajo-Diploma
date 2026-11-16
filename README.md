@@ -160,6 +160,8 @@ Validación reproducible: `powershell -NoProfile -File Scripts/test-usabilidad-o
 
 En **Ventas**, cambiar de perfume y finalizar una venta restablecen la cantidad a 1. **Actualizar** conserva la cantidad si sigue seleccionado el mismo perfume. **Nueva venta** permite descartar una preparación con confirmación; conserva todos los datos si se cancela el descarte. Las pantallas de Compras y N03 permiten desplazamiento vertical para mantener utilizables las tablas, gráficos y acciones en ventanas pequeñas.
 
+Las opciones **Venta ocasional** y **Con cliente** indican la modalidad. La primera es la inicial; la segunda habilita buscar o registrar el cliente y requiere identificarlo antes de confirmar. Volver a ocasional conserva los productos, quita el cliente y recalcula sin descuento de membresía. Una venta terminada vuelve a ocasional. El precio unitario proviene del catálogo; la membresía puede reducir el importe neto.
+
 ### Copia independiente para ensayar
 
 Desde el repositorio compilado, ejecutar:
