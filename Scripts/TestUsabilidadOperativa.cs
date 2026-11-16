@@ -220,6 +220,18 @@ internal static class TestUsabilidadOperativa
         Assert(new InventarioBLL().VerificarStock(productos[0].IdProducto)==stock+1 && Find<Label>(compras,"lblStock").Text.EndsWith((stock+1).ToString()) &&
             Find<DataGridView>(compras,"dgvTrazabilidad").Rows.Count==lotes+1 && lote.Text=="" && !compras.TieneCambiosPendientes,
             "Registrar recepcion actualiza stock y trazabilidad visibles y limpia la preparacion");
+        var trazabilidad=Find<DataGridView>(compras,"dgvTrazabilidad");
+        var ingreso=trazabilidad.Rows.Cast<DataGridViewRow>().Single(r => (string)r.Cells["CodigoLote"].Value=="TEST-RECEPCION-SEGURA");
+        var proveedorIngreso=new ProveedorBLL().Listar(false).Single(p=>p.IdProveedor==orden.IdProveedor);
+        Assert((string)ingreso.Cells["Producto"].Value==productos[0].Nombre && (string)ingreso.Cells["Proveedor"].Value==proveedorIngreso.RazonSocial,
+            "La trazabilidad muestra nombres del perfume y proveedor del lote recibido");
+        Assert(!trazabilidad.Columns.Contains("IdProducto") && !trazabilidad.Columns.Contains("IdProveedor") && !trazabilidad.Columns.Contains("CertificadoOrigen") && trazabilidad.Columns["IdLote"].HeaderText=="# Lote",
+            "Inventario presenta # Lote y omite identificadores internos de producto y proveedor y certificado");
+        var productoInventario=Find<ComboBox>(compras,"cmbInventarioProducto");
+        productoInventario.SelectedValue=productos[1].IdProducto; Click(compras,"btnConsultarInventario");
+        Assert(trazabilidad.Rows.Cast<DataGridViewRow>().All(r=>(string)r.Cells["Producto"].Value==productos[1].Nombre) && trazabilidad.Columns["IdLote"].HeaderText=="# Lote",
+            "Cambiar el perfume actualiza los nombres y conserva los encabezados de inventario");
+        productoInventario.SelectedValue=productos[0].IdProducto; Click(compras,"btnConsultarInventario");
         unidades.Value=3; lote.Text="TEST-PREPARADO"; origen.Text="Argentina";
         bll.RecepcionarMercaderia(orden.IdOrdenCompra,new System.Collections.Generic.List<Lote> {
             new Lote { IdProducto=productos[0].IdProducto, CodigoLote="TEST-EXTERNO", Origen="Argentina", CantidadIngresada=2, FechaVencimiento=DateTime.Today.AddYears(1) }

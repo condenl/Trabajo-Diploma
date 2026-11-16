@@ -152,7 +152,7 @@ En **Órdenes de compra → Nuevo borrador**, elegir proveedor y agregar los per
 
 Los importes usan coma decimal: `12.000,50` o `12000,50`. El editor conserva y señala entradas inválidas, fuera de rango o con demasiados decimales; una entrada como `12000.50` se rechaza. No se reemplaza silenciosamente por otro importe ni se permite guardar hasta corregirla.
 
-En **Recepción e inventario**, cambiar de orden o perfume con datos preparados requiere confirmar su descarte. **Actualizar** conserva el contexto de la entrega y señala si una recepción de otro operador redujo su saldo. Al registrar el ingreso se muestran inmediatamente las existencias y la trazabilidad del perfume recibido. Las escrituras de Compras, Depósito y Ventas requieren una sesión activa y el permiso del actor.
+En **Recepción e inventario**, cambiar de orden o perfume con datos preparados requiere confirmar su descarte. **Actualizar** conserva el contexto de la entrega y señala si una recepción de otro operador redujo su saldo. Al registrar el ingreso se muestran inmediatamente las existencias y la trazabilidad del perfume recibido. La tabla identifica los lotes con **# Lote**, muestra los nombres del producto y proveedor (incluidos proveedores inactivos con ingresos históricos) y conserva las cantidades y referencias de orden. Las escrituras de Compras, Depósito y Ventas requieren una sesión activa y el permiso del actor.
 
 Validación reproducible: `powershell -NoProfile -File Scripts/test-usabilidad-operativa.ps1 -ServerInstance "DESKTOP-TFHVP49"` (o `"(localdb)\MSSQLLocalDB"`). Crea una base aislada; no modifica la configuración de desarrollo. Evidencia: [Verificacion_Demo_Compras.md](Documentacion/Verificacion_Demo_Compras.md).
 
