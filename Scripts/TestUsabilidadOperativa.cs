@@ -95,6 +95,51 @@ internal static class TestUsabilidadOperativa
         public bool Descartar; public int Consultas;
         protected override bool ConfirmarDescarteVenta() { Consultas++; return Descartar; }
     }
+    private static void ComprobarEdicionPerfume(Usuario owner, Producto original)
+    {
+        var bll=new ProductoBLL(); original=bll.Obtener(original.IdProducto); int cantidadProductos=Count("Producto");
+        var historial=Query("SELECT IdVenta,IdLote,Cantidad,PrecioUnitario,DescuentoUnitario FROM DetalleVenta WHERE IdProducto="+original.IdProducto+" ORDER BY IdVenta,IdLote");
+        string antes=string.Join(";",historial.Rows.Cast<DataRow>().Select(r=>string.Join("|",r.ItemArray.Select(Convert.ToString))));
+        using(var editar=new FormAltaPerfume(true)) {
+            editar.Show(); Application.DoEvents();
+            Find<ComboBox>(editar,"cmbEditarPerfume").SelectedValue=original.IdProducto;
+            Assert(Find<TextBox>(editar,"txtProductoCodigo").Text==original.Codigo && Find<NumericUpDown>(editar,"nudProductoPrecio").Value==original.PrecioVenta,
+                "Editar perfume recupera los datos y el precio del producto elegido");
+            Find<NumericUpDown>(editar,"nudProductoPrecio").Value=original.PrecioVenta+100;
+            Click(editar,"btnCancelarCatalogo");
+            Assert(bll.Obtener(original.IdProducto).PrecioVenta==original.PrecioVenta && Count("Producto")==cantidadProductos,
+                "Cancelar la edicion conserva el catalogo sin crear otro perfume");
+        }
+        using(var editar=new FormAltaPerfume(true)) {
+            editar.Show(); Application.DoEvents(); Find<ComboBox>(editar,"cmbEditarPerfume").SelectedValue=original.IdProducto;
+            Find<TextBox>(editar,"txtProductoNombre").Text=""; Click(editar,"btnGuardarCatalogo");
+            Assert(editar.Visible && editar.DialogResult!=DialogResult.OK && Find<Label>(editar,"lblErrorCatalogo").Text.Contains("nombre") && bll.Obtener(original.IdProducto).Nombre==original.Nombre,
+                "La edicion invalida queda abierta con aviso y no modifica el perfume");
+            Find<TextBox>(editar,"txtProductoNombre").Text=original.Nombre;
+            Find<TextBox>(editar,"txtProductoMarca").Text="Marca editada";
+            Find<NumericUpDown>(editar,"nudProductoPrecio").Value=original.PrecioVenta+250.50m;
+            Click(editar,"btnGuardarCatalogo");
+            var guardado=bll.Obtener(original.IdProducto);
+            Assert(editar.DialogResult==DialogResult.OK && guardado.PrecioVenta==original.PrecioVenta+250.50m && guardado.Marca=="Marca editada" && guardado.Codigo==original.Codigo && Count("Producto")==cantidadProductos,
+                "Guardar edicion actualiza datos y precio manteniendo el ID y la cantidad de perfumes");
+            var nueva=new Venta(); nueva.Detalles.Add(new DetalleVenta {IdProducto=original.IdProducto,Cantidad=1});
+            new VentaBLL().CotizarVenta(nueva);
+            Assert(nueva.Subtotal==guardado.PrecioVenta && nueva.Detalles.All(d=>d.PrecioUnitario==guardado.PrecioVenta),
+                "Una venta posterior toma el nuevo precio de catalogo");
+        }
+        string despues=string.Join(";",Query("SELECT IdVenta,IdLote,Cantidad,PrecioUnitario,DescuentoUnitario FROM DetalleVenta WHERE IdProducto="+original.IdProducto+" ORDER BY IdVenta,IdLote").Rows.Cast<DataRow>().Select(r=>string.Join("|",r.ItemArray.Select(Convert.ToString))));
+        Assert(historial.Rows.Count>0 && antes==despues,"Editar el precio de catalogo conserva los precios y descuentos de ventas historicas");
+        var inactivo=new Producto {Codigo="TEST-EDIT-INACTIVO",Nombre="Perfume inactivo",PrecioVenta=123.45m,Activo=false}; bll.Guardar(inactivo);
+        using(var editar=new FormAltaPerfume(true)) {
+            editar.Show(); Application.DoEvents(); Find<ComboBox>(editar,"cmbEditarPerfume").SelectedValue=inactivo.IdProducto;
+            Find<NumericUpDown>(editar,"nudProductoPrecio").Value=200; Click(editar,"btnGuardarCatalogo");
+            Assert(!bll.Obtener(inactivo.IdProducto).Activo && bll.Obtener(inactivo.IdProducto).PrecioVenta==200,
+                "Editar un perfume inactivo conserva su estado sin reactivarlo");
+        }
+        var vendedor=new UsuarioBLL().Login("demo.ventas@perfumeria.example","DemoVentas2026!");
+        Denegado(delegate {using(var editar=new FormAltaPerfume(true)) { }},"Ventas no puede abrir la edicion de catalogos sin permiso de Compras");
+        Session.Instance.Login(owner);
+    }
     private static void ComprobarNuevaVenta(Form host)
     {
         var vista = new VentaPrueba { ModoPrueba=true }; Host(host,vista);
@@ -421,6 +466,7 @@ internal static class TestUsabilidadOperativa
                 Assert(Count("Venta") == sales + 1 && (decimal)persisted[0] == cotizacion.Subtotal && (decimal)persisted[1] == cotizacion.Descuento && (decimal)persisted[2] == cotizacion.Total, "Importes confirmados coinciden con vista previa y membresia");
                 Assert(grid.Rows.Count == 0 && email.Text == "" && Field(ventas, "clienteActual") == null && Find<NumericUpDown>(ventas,"nudCantidad").Value==1, "Venta finalizada prepara carrito, identidad y cantidad limpios");
                 Assert(Find<RadioButton>(ventas,"rbVentaOcasional").Checked && !email.Enabled,"Finalizar una venta vuelve a la modalidad ocasional");
+                ComprobarEdicionPerfume(owner,floral);
                 ComprobarPreparacionCompras(host, owner);
                 var compras = new UC_Aprovisionamiento(owner) { ModoPrueba = true }; Host(host, compras);
                 var orders = Find<DataGridView>(compras, "dgvOrdenes");

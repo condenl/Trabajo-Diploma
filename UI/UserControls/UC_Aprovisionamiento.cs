@@ -160,20 +160,21 @@ namespace UI.UserControls
                 var catalogos = new ToolStripMenuItem("Catálogos") { Name = "menuCatalogos" };
                 catalogos.DropDownItems.Add(new ToolStripMenuItem("Nuevo proveedor...", null, delegate { AbrirAlta(true); }) { Name = "menuNuevoProveedor" });
                 catalogos.DropDownItems.Add(new ToolStripMenuItem("Nuevo perfume...", null, delegate { AbrirAlta(false); }) { Name = "menuNuevoPerfume" });
+                catalogos.DropDownItems.Add(new ToolStripMenuItem("Editar perfume...", null, delegate { AbrirAlta(false, true); }) { Name = "menuEditarPerfume" });
                 menu.Items.Add(catalogos); Controls.Add(menu);
             }
         }
 
-        private void AbrirAlta(bool proveedor)
+        private void AbrirAlta(bool proveedor, bool editarPerfume = false)
         {
             Ejecutar(delegate
             {
                 if (!TienePermiso(TipoPermiso.Aprovisionamiento_Gestion)) throw new UnauthorizedAccessException("Se requiere permiso de Compras.");
-                using (Form alta = proveedor ? (Form)new FormAltaProveedor() : new FormAltaPerfume())
+                using (Form alta = proveedor ? (Form)new FormAltaProveedor() : new FormAltaPerfume(editarPerfume))
                     if (alta.ShowDialog(this) == DialogResult.OK)
                     {
                         RecargarTodo();
-                        estadoCarga.Text = (proveedor ? "Proveedor" : "Perfume") + " agregado. Listas actualizadas a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
+                        estadoCarga.Text = (proveedor ? "Proveedor agregado" : editarPerfume ? "Perfume actualizado" : "Perfume agregado") + ". Listas actualizadas a las " + DateTime.Now.ToString("HH:mm:ss") + ".";
                     }
             }, null);
         }

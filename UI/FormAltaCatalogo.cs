@@ -44,8 +44,8 @@ namespace UI
         protected static void ExigirPermiso()
         {
             var actor = Session.Instance.Usuario;
-            if (actor == null || !actor.TienePermiso(TipoPermiso.Aprovisionamiento_Gestion))
-                throw new UnauthorizedAccessException("El alta de catálogos requiere una sesión de Compras o Dueño.");
+            if (actor == null || !actor.Activo || !actor.TienePermiso(TipoPermiso.Aprovisionamiento_Gestion))
+                throw new UnauthorizedAccessException("La gestión de catálogos requiere una sesión de Compras o Dueño.");
         }
         private void Guardar()
         {
@@ -83,15 +83,43 @@ namespace UI
         private readonly TextBox familia = new TextBox { Name = "txtProductoFamilia", MaxLength = 100 };
         private readonly NumericUpDown precio = new NumeroRegional { Name = "nudProductoPrecio", Maximum = 100000000, DecimalPlaces = 2, ThousandsSeparator = true };
         private readonly NumericUpDown minimo = new NumeroRegional { Name = "nudProductoStockMinimo", Maximum = 100000 };
-        public FormAltaPerfume() : base("Nuevo perfume")
+        private readonly ComboBox seleccion = new ComboBox { Name = "cmbEditarPerfume", DropDownStyle = ComboBoxStyle.DropDownList, FormattingEnabled = true, DropDownWidth = 500 };
+        private readonly bool edicion;
+        private Producto productoEditado;
+        public FormAltaPerfume() : this(false) { }
+        public FormAltaPerfume(bool editar) : base(editar ? "Editar perfume" : "Nuevo perfume")
         {
+            edicion = editar;
+            if (editar) Campo("Perfume a editar", seleccion);
             Campo("Código", codigo); Campo("Nombre", nombre); Campo("Marca", marca); Campo("Familia olfativa", familia);
             Campo("Precio de venta", precio); Campo("Stock mínimo", minimo);
+            if (editar) {
+                seleccion.DisplayMember = "Nombre"; seleccion.ValueMember = "IdProducto";
+                seleccion.Format += delegate(object sender, ListControlConvertEventArgs e) {
+                    var p = (Producto)e.ListItem; e.Value = p.Nombre + " · " + p.Codigo + (p.Activo ? "" : " (inactivo)");
+                };
+                seleccion.SelectedIndexChanged += delegate {
+                    productoEditado = seleccion.SelectedItem as Producto;
+                    if (productoEditado == null) return;
+                    codigo.Text = productoEditado.Codigo; nombre.Text = productoEditado.Nombre;
+                    marca.Text = productoEditado.Marca; familia.Text = productoEditado.FamiliaOlfativa;
+                    precio.Maximum = Math.Max(100000000m, productoEditado.PrecioVenta);
+                    minimo.Maximum = Math.Max(100000m, productoEditado.StockMinimo);
+                    NumeroRegional.Restablecer(precio, productoEditado.PrecioVenta);
+                    NumeroRegional.Restablecer(minimo, productoEditado.StockMinimo);
+                };
+                seleccion.DataSource = new ProductoBLL().Listar(false);
+            }
+            TemaAplicacion.Aplicar(this);
         }
         protected override void GuardarRegistro()
         {
             NumeroRegional.ExigirEntradas(precio, minimo);
-            new ProductoBLL().Guardar(new Producto { Codigo = codigo.Text.Trim(), Nombre = nombre.Text.Trim(), Marca = marca.Text.Trim(),
+            var bll = new ProductoBLL();
+            var existente = edicion && productoEditado != null ? bll.Obtener(productoEditado.IdProducto) : null;
+            if (edicion && existente == null) throw new InvalidOperationException("Seleccione un perfume existente para editar.");
+            bll.Guardar(new Producto { IdProducto = existente == null ? 0 : existente.IdProducto, Activo = existente == null || existente.Activo,
+                Codigo = codigo.Text.Trim(), Nombre = nombre.Text.Trim(), Marca = marca.Text.Trim(),
                 FamiliaOlfativa = familia.Text.Trim(), PrecioVenta = precio.Value, StockMinimo = (int)minimo.Value });
         }
     }
