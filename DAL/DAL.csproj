@@ -45,9 +45,27 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AprovisionamientoDAL.cs" />
+    <Compile Include="AuditoriaDAL.cs" />
+    <Compile Include="BitacoraDAL.cs" />
     <Compile Include="Conexion.cs" />
-    <Compile Include="RolDAL.cs" />
+    <Compile Include="IdiomaDAL.cs" />
+    <Compile Include="InventarioDAL.cs" />
+    <Compile Include="Interfaces\IAprovisionamientoRepository.cs" />
+    <Compile Include="Interfaces\IInventarioRepository.cs" />
+    <Compile Include="Interfaces\IProductoRepository.cs" />
+    <Compile Include="Interfaces\IProveedorRepository.cs" />
+    <Compile Include="Interfaces\IVentaRepository.cs" />
+    <Compile Include="ProductoDAL.cs" />
+    <Compile Include="ProveedorDAL.cs" />
+    <Compile Include="EvaluacionProveedorDAL.cs" />
+    <Compile Include="Interfaces\IEvaluacionProveedorRepository.cs" />
+    <Compile Include="SeguridadDAL.cs" />
+    <Compile Include="SoporteDAL.cs" />
+    <Compile Include="TraduccionDAL.cs" />
     <Compile Include="UsuarioDAL.cs" />
+    <Compile Include="VentaDAL.cs" />
+    <Compile Include="DVVDAL.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -58,6 +76,10 @@
     <ProjectReference Include="..\MPP\MPP.csproj">
       <Project>{6fee37dc-d54b-4308-889d-4ec081cea04c}</Project>
       <Name>MPP</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Servicios\Servicios.csproj">
+      <Project>{6e6fe359-5d39-4b41-bd15-e90a99b8fb54}</Project>
+      <Name>Servicios</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

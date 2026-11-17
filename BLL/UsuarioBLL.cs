@@ -1,91 +1,216 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using BE;
+using BE.Excepciones;
 using BE.Interfaces;
 using DAL;
 using Servicios;
 
 namespace BLL
 {
-    public class UsuarioBLL : IVisitante, IAdministrador, IGestor<Usuario>
+    public class UsuarioBLL : IVisitante, IAdministrador, IGestor<Usuario>, IObservado
     {
         public UsuarioBLL() { }
+
         public List<Usuario> ListarTodos() => UsuarioDAL.Instancia.Listar();
+
+        public List<string> VerificarIntegridad()
+        {
+            var usuarios = UsuarioDAL.Instancia.Listar();
+            var storedDVV = DVVDAL.Instancia.Obtener("Usuario");
+            return Servicios.Integridad.VerificarIntegridad(usuarios, storedDVV);
+        }
+
+        public void RecalcularDV()
+        {
+            UsuarioDAL.Instancia.RecalcularDV();
+        }
+
+        public void RestaurarBaseDeDatos(string backupPath)
+        {
+            Conexion.Instancia.RestaurarBaseDeDatos(backupPath);
+        }
 
         public void Guardar(Usuario u)
         {
-            if (!EsEmailValido(u.Email)) throw new Exception("Email inválido.");
+            ValidarFormatoEmail(u.Email);
+            string responsable = Session.Instance.Usuario?.Email ?? "SISTEMA";
+
             if (u.Id == 0)
             {
-                if (string.IsNullOrEmpty(u.Password)) throw new Exception("Contraseña obligatoria.");
+                ValidarPassword(u.Password);
+                u.Dni = Encriptador.EncriptarAES(u.Dni);
                 UsuarioDAL.Instancia.Insertar(u);
+
+                GestorEventos.Instancia.Notificar(new EventoBitacora(responsable, "ALTA_USUARIO", $"Se creó el usuario: {u.Email}"));
             }
-            else UsuarioDAL.Instancia.Modificar(u);
+            else
+            {
+                if (!string.IsNullOrEmpty(u.Password)) ValidarPassword(u.Password);
+                u.Dni = Encriptador.EncriptarAES(u.Dni);
+                UsuarioDAL.Instancia.Modificar(u);
+
+                GestorEventos.Instancia.Notificar(new EventoBitacora(responsable, "MODIFICACION", $"Se actualizaron datos del usuario ID: {u.Id} ({u.Email})"));
+            }
         }
 
         public void Eliminar(int id) => UsuarioDAL.Instancia.Eliminar(new Usuario { Id = id });
+
         public List<Usuario> Listar() => ListarTodos();
-        public void Eliminar(Usuario u) => UsuarioDAL.Instancia.Eliminar(u);
+
+        public void Eliminar(Usuario u)
+        {
+            UsuarioDAL.Instancia.Eliminar(u);
+            string responsable = Session.Instance.Usuario?.Email ?? "SISTEMA";
+            GestorEventos.Instancia.Notificar(new EventoBitacora(responsable, "BAJA_USUARIO", $"Eliminación física del usuario: {u.Email}"));
+        }
 
         public void Insertar(Usuario u, string pass)
         {
-            if (!EsEmailValido(u.Email)) throw new Exception("Email inválido.");
-            if (UsuarioDAL.Instancia.ExisteDni(u.Dni)) throw new Exception("DNI ya existe.");
-            if (UsuarioDAL.Instancia.BuscarPorEmail(u.Email) != null) throw new Exception("Email ya existe.");
-            if (string.IsNullOrEmpty(pass)) throw new Exception("Pass obligatoria.");
+            ValidarFormatoEmail(u.Email);
+            ValidarPassword(pass);
 
+            string dniCifrado = Encriptador.EncriptarAES(u.Dni);
+            if (UsuarioDAL.Instancia.ExisteDni(dniCifrado)) throw new Exception("El DNI ingresado ya se encuentra registrado.");
+            if (UsuarioDAL.Instancia.BuscarPorEmail(u.Email) != null) throw new Exception("El Email ya se encuentra registrado.");
+
+            u.Dni = dniCifrado;
             u.Password = Encriptador.Hash(pass);
+
             if (u.FechaAlta == DateTime.MinValue) u.FechaAlta = DateTime.Now;
+
             UsuarioDAL.Instancia.Insertar(u);
+
+            string responsable = Session.Instance.Usuario?.Email ?? u.Email;
+            GestorEventos.Instancia.Notificar(new EventoBitacora(responsable, "ALTA_USUARIO", $"Nuevo usuario registrado: {u.Email}"));
         }
 
         public void Modificar(Usuario u, string newPass)
         {
-            if (!EsEmailValido(u.Email)) throw new Exception("Email inválido.");
-            var existente = UsuarioDAL.Instancia.BuscarPorEmail(u.Email);
-            if (existente != null && existente.Id != u.Id) throw new Exception("Email duplicado.");
+            ValidarFormatoEmail(u.Email);
 
-            if (!string.IsNullOrEmpty(newPass)) u.Password = Encriptador.Hash(newPass);
+            var existente = UsuarioDAL.Instancia.BuscarPorEmail(u.Email);
+            if (existente != null && existente.Id != u.Id) throw new Exception("El Email ya pertenece a otro usuario.");
+            if (!string.IsNullOrEmpty(newPass))
+            {
+                ValidarPassword(newPass);
+                u.Password = Encriptador.Hash(newPass);
+            }
+
+            u.Dni = Encriptador.EncriptarAES(u.Dni);
             UsuarioDAL.Instancia.Modificar(u);
+
+            string responsable = Session.Instance.Usuario?.Email ?? "SISTEMA";
+            string tipoEvento = u.Activo ? "MODIFICACION" : "BAJA_LOGICA";
+            string descripcion = u.Activo ? $"Se actualizaron credenciales/datos de: {u.Email}" : $"Se desactivó la cuenta de: {u.Email}";
+
+            GestorEventos.Instancia.Notificar(new EventoBitacora(responsable, tipoEvento, descripcion));
         }
 
         public Usuario Login(string email, string passwordSinHash)
         {
-            if (!EsEmailValido(email)) throw new Exception("Formato de email inválido.");
-
+            ValidarFormatoEmail(email);
             Usuario usuario = UsuarioDAL.Instancia.BuscarPorEmail(email);
 
-            if (usuario == null) return null;
+            if (usuario == null)
+            {
+                GestorEventos.Instancia.Notificar(new EventoBitacora(email, "LOGIN_FALLIDO", "Intento de inicio de sesión con email no registrado."));
+                return null;
+            }
 
             if (!usuario.Activo)
-                throw new Exception("Su cuenta está bloqueada. Contacte a soporte.");
+            {
+                GestorEventos.Instancia.Notificar(new EventoBitacora(email, "BLOQUEO", "Intento de inicio de sesión sobre una cuenta bloqueada."));
+                throw new UsuarioBloqueadoException("Su cuenta se encuentra bloqueada. Contacte al administrador.");
+            }
 
             string passHash = Encriptador.Hash(passwordSinHash);
 
             if (usuario.Password == passHash)
             {
                 UsuarioDAL.Instancia.ResetearIntentos(email);
+
+                SeguridadBLL seguridadBLL = new SeguridadBLL();
+                seguridadBLL.CargarEstructuraPermisos(usuario);
+
+
+                if (usuario.Permisos == null || usuario.Permisos.Count == 0)
+                {
+                    GestorEventos.Instancia.Notificar(new EventoBitacora(email, "SEGURIDAD", "Acceso denegado: Usuario sin roles en el sistema."));
+                    throw new UsuarioSinRolException("Su cuenta no tiene un perfil asignado.\nPor favor, contacte a Soporte Técnico o al administrador de la perfumería.");
+                }
+
+                Session.Instance.Login(usuario);
+                GestorEventos.Instancia.Notificar(new EventoBitacora(email, "LOGIN", "Inicio de sesión exitoso."));
                 return usuario;
             }
             else
             {
                 UsuarioDAL.Instancia.SumarIntentoFallido(email);
                 int intentosActuales = usuario.IntentosFallidos + 1;
-                if (intentosActuales >= 4)
-                    throw new Exception("Ha excedido los intentos permitidos. Cuenta bloqueada.");
 
+                if (intentosActuales >= 4)
+                {
+                    GestorEventos.Instancia.Notificar(new EventoBitacora(email, "BLOQUEO", "Cuenta bloqueada por alcanzar el máximo de intentos."));
+                    throw new UsuarioBloqueadoException("Ha excedido los intentos permitidos. Su cuenta ha sido bloqueada.");
+                }
+
+                GestorEventos.Instancia.Notificar(new EventoBitacora(email, "LOGIN_FALLIDO", $"Contraseña incorrecta. Intento nro: {intentosActuales}."));
                 return null;
             }
         }
 
+        public Usuario BuscarPorEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) return null;
+            return UsuarioDAL.Instancia.BuscarPorEmail(email);
+        }
+
         public void Registrar(Usuario u, string pass) => Insertar(u, pass);
 
-        private bool EsEmailValido(string email)
+        public void Logout()
         {
-            if (string.IsNullOrWhiteSpace(email)) return false;
-            try { return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$", RegexOptions.IgnoreCase); }
-            catch { return false; }
+            if (Session.Instance.IsLogged())
+            {
+                string email = Session.Instance.Usuario.Email;
+                Session.Instance.Logout();
+                GestorEventos.Instancia.Notificar(new EventoBitacora(email, "LOGOUT", "Sesión cerrada por el usuario."));
+            }
+        }
+
+        public void Suscribir(IObserver observador)
+        {
+            GestorEventos.Instancia.Suscribir(observador);
+        }
+
+        public void Desuscribir(IObserver observador)
+        {
+            GestorEventos.Instancia.Desuscribir(observador);
+        }
+
+        public void Notificar(EventoBitacora evento)
+        {
+            GestorEventos.Instancia.Notificar(evento);
+        }
+
+        private void ValidarFormatoEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email)) throw new Exception("El correo electrónico no puede estar vacío.");
+            string pattern = @"^[^@\s]+@[^@\s]+\.[a-zA-Z]{2,}$";
+
+            if (!Regex.IsMatch(email, pattern))
+            {
+                throw new Exception("El formato del correo electrónico es inválido (ejemplo: usuario@dominio.com).");
+            }
+        }
+
+        private void ValidarPassword(string pass)
+        {
+            if (string.IsNullOrWhiteSpace(pass) || pass.Length < 4)
+            {
+                throw new Exception("La contraseña debe tener al menos 4 caracteres.");
+            }
         }
     }
 }

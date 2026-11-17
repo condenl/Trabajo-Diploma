@@ -1,8 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using BLL;
+using Servicios;
 
 namespace UI
 {
@@ -16,6 +18,9 @@ namespace UI
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            GestorEventos.Instancia.Suscribir(BitacoraBLL.Instancia);
+            GestorEventos.Instancia.Suscribir(LogManager.Instancia);
             Application.Run(new Login());
         }
     }

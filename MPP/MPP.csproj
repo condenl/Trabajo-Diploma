@@ -41,14 +41,28 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="RolMPP.cs" />
+    <Compile Include="AprovisionamientoMPP.cs" />
+    <Compile Include="AuditoriaMPP.cs" />
+    <Compile Include="BitacoraMPP.cs" />
+    <Compile Include="IdiomaMPP.cs" />
+    <Compile Include="InventarioMPP.cs" />
+    <Compile Include="ProductoMPP.cs" />
+    <Compile Include="ProveedorMPP.cs" />
+    <Compile Include="SeguridadMPP.cs" />
+    <Compile Include="SoporteMPP.cs" />
+    <Compile Include="TraduccionMPP.cs" />
     <Compile Include="UsuarioMPP.cs" />
+    <Compile Include="VentaMPP.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BE\BE.csproj">
       <Project>{1675d3ed-a77a-45b6-a2ba-5b464fca8a45}</Project>
       <Name>BE</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Servicios\Servicios.csproj">
+      <Project>{6e6fe359-5d39-4b41-bd15-e90a99b8fb54}</Project>
+      <Name>Servicios</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
